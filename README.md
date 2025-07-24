@@ -38,6 +38,7 @@ ATS Resume Scanner is a custom-built Elementor widget that allows users to uploa
 
 ## 📦 Folder Structure
 
+```text
 ats-scanner-elementor/
 │
 ├── assets/
@@ -48,6 +49,7 @@ ats-scanner-elementor/
 │   └── ats-scanner-widget.php
 ├── ats-scanner-elementor.php
 └── README.md
+```
 
 ---
 
