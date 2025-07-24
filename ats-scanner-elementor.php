@@ -2,7 +2,7 @@
 /**
  * Plugin Name: JobReady - An Elementor Widget By Mazin Digital
  * Description: Your personal resume assistant. Upload, scan, and get instant feedback on how job-ready your resume really is.
- * Version: 1.0.7
+ * Version: 1.0.6
  * Author: <a href="https://mazindigital.com">Mazin Digital</a> | <a href="https://github.com/woories19">GitHub</a>
  */
 
