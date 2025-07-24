@@ -1,0 +1,18 @@
+# Ignore Python venv
+venv/
+
+# Ignore __pycache__ folders
+__pycache__/
+
+# Ignore temporary files
+*.pyc
+*.pyo
+*.log
+
+# Ignore uploads if needed
+uploads/*
+!uploads/.gitkeep
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
