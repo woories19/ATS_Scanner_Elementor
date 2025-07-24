@@ -1,11 +1,9 @@
-# ats_backend.py (Refactored Flask Backend)
-
+# Re-import after environment reset
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os
 import docx2txt
 import fitz  # PyMuPDF
-from datetime import datetime
 
 app = Flask(__name__)
 CORS(app)
@@ -13,7 +11,7 @@ CORS(app)
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# --- File Text Extractor ---
+# --- Utility functions ---
 def extract_text(file_path):
     _, ext = os.path.splitext(file_path.lower())
     if ext == ".docx":
@@ -26,43 +24,33 @@ def extract_text(file_path):
         return text
     return None
 
-# --- ATS Scoring Logic ---
 def ats_score(text):
     score = 0
-    feedback = []
-    visible_recommendations = []
-    locked_recommendations = []
+    recommendations = []
 
     if "@" in text:
         score += 10
     else:
-        feedback.append("Missing email address.")
-        visible_recommendations.append("Add a valid email address to your contact section.")
+        recommendations.append("Add a professional email address.")
 
-    if any(c.isdigit() for c in text if c in '+0123456789'):
+    if "phone" in text.lower() or "+" in text:
         score += 10
     else:
-        feedback.append("Missing phone number.")
-        visible_recommendations.append("Include a professional phone number.")
+        recommendations.append("Include a valid phone number.")
 
-    sections = ["experience", "education", "skills", "summary"]
-    found_sections = [s for s in sections if s in text.lower()]
-    score += len(found_sections) * 10
-    for s in sections:
-        if s not in text.lower():
-            feedback.append(f"Missing section: {s.capitalize()}")
-            locked_recommendations.append(f"Include a clear '{s.capitalize()}' section.")
+    for section in ["experience", "education", "skills", "summary"]:
+        if section in text.lower():
+            score += 10
+        else:
+            recommendations.append(f"Add a clear '{section.capitalize()}' section.")
 
     if "-" in text or "•" in text:
         score += 10
     else:
-        feedback.append("No bullet points found.")
-        locked_recommendations.append("Use bullet points for clarity and structure.")
+        recommendations.append("Use bullet points for readability.")
 
-    score = min(score, 100)
-    return score, feedback, visible_recommendations, locked_recommendations
+    return min(score, 100), recommendations
 
-# --- Keyword Matching ---
 def extract_keywords(text):
     words = [w.strip(".,") for w in text.lower().split()]
     stopwords = {"and", "or", "with", "the", "a", "an", "in", "on", "to", "of", "at", "by", "for", "from", "is", "as", "that"}
@@ -71,48 +59,47 @@ def extract_keywords(text):
 def compare_keywords(resume_text, job_description):
     resume_keywords = set(extract_keywords(resume_text))
     job_keywords = set(extract_keywords(job_description))
-    match = resume_keywords.intersection(job_keywords)
-    if not job_keywords:
-        return {'match_percentage': 0, 'matching_keywords': [], 'missing_keywords': []}
+    matching = resume_keywords.intersection(job_keywords)
 
-    match_percentage = (len(match) / len(job_keywords)) * 100
+    match_percentage = (len(matching) / len(job_keywords)) * 100 if job_keywords else 0
+
     return {
         'match_percentage': round(match_percentage, 2),
-        'matching_keywords': sorted(match),
-        'missing_keywords': sorted(job_keywords - resume_keywords)
+        'matching_keywords': sorted(matching),
+        'missing_keywords': sorted(job_keywords - resume_keywords),
     }
 
-# --- API Endpoint ---
+# --- Main API Endpoint ---
 @app.route('/api/analyze', methods=['POST'])
 def analyze():
     file = request.files.get('resume')
-    job_desc = request.form.get('job_description', '')
-    user_email = request.form.get('email', '')
-    user_name = request.form.get('name', '')
+    job_description = request.form.get('job_description', '')
 
     if not file:
-        return jsonify({'error': 'No resume file provided.'}), 400
+        return jsonify({'error': 'Resume not uploaded'}), 400
 
     filepath = os.path.join(UPLOAD_FOLDER, file.filename)
     file.save(filepath)
     text = extract_text(filepath)
+
     if not text:
-        return jsonify({'error': 'Unsupported file format.'}), 400
+        return jsonify({'error': 'Unsupported file format'}), 400
 
-    ats, feedback, visible, locked = ats_score(text)
-    keyword_data = compare_keywords(text, job_desc)
+    score, recommendations = ats_score(text)
+    keyword_data = compare_keywords(text, job_description) if job_description else None
+    keywords = extract_keywords(text)
 
-    response = {
-        'ats_score': ats,
-        'feedback': feedback,
-        'visible_recommendations': visible,
-        'locked_recommendations': locked,
+    # Split visible and locked recommendations
+    visible_recommendations = recommendations[:2]
+    locked_recommendations = recommendations[2:]
+
+    return jsonify({
+        'ats_score': score,
+        'visible_recommendations': visible_recommendations,
+        'locked_recommendations': locked_recommendations,
         'keyword_analysis': keyword_data,
-        'user_name': user_name,
-        'user_email': user_email
-    }
-
-    return jsonify(response)
+        'keywords': keywords
+    })
 
 if __name__ == '__main__':
     app.run(debug=True)
