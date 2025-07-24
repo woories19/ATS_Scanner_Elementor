@@ -1,8 +1,8 @@
 <?php
 /**
- * Plugin Name: ATS Scanner Elementor Widget
- * Description: ATS Resume Scanner integration for Elementor
- * Version: 1.0.4
+ * Plugin Name: JobReady by Mazin Digital
+ * Description: Your personal resume assistant. Upload, scan, and get instant feedback on how job-ready your resume really is.
+ * Version: 1.0.7
  * Author: github.com/woories19
  */
 
