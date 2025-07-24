@@ -5,11 +5,11 @@ add_action('wp_enqueue_scripts', function() {
 });
 class ATS_Scanner_Widget extends \Elementor\Widget_Base {
     public function get_name() {
-        return 'ats_scanner';
+        return 'job_ready_elementor';
     }
 
     public function get_title() {
-        return 'ATS Resume Scanner';
+        return 'JobReady By Mazin Digital';
     }
 
     public function get_icon() {
