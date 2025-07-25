@@ -4,6 +4,9 @@ venv/
 # Ignore __pycache__ folders
 __pycache__/
 
+# Ignore .env files
+.env
+
 # Ignore temporary files
 *.pyc
 *.pyo
