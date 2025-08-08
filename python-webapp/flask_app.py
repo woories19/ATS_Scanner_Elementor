@@ -1,105 +1,93 @@
 import os
-import requests
-import fitz  # PyMuPDF
-import docx
 from flask import Flask, request, jsonify
-from werkzeug.utils import secure_filename
-from dotenv import load_dotenv
-
-# Load .env for Hugging Face token
-load_dotenv()
-HUGGINGFACE_API_TOKEN = os.getenv("HF_API_TOKEN")
+from PyPDF2 import PdfReader
+from docx import Document
+from openai import OpenAI
 
 app = Flask(__name__)
-UPLOAD_FOLDER = 'uploads'
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# Ensure upload folder exists
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+# --- CONFIG ---
+OPENAI_API_KEY = "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"  # Replace with your key directly
+client = OpenAI(api_key=OPENAI_API_KEY)
 
-# Hugging Face inference settings
-HUGGINGFACE_API_URL = "https://api-inference.huggingface.co/models/google/flan-t5-small"
-headers = {
-    "Authorization": f"Bearer {HUGGINGFACE_API_TOKEN}"
-}
-
-# === Helper functions ===
-
-def extract_text_from_pdf(file_path):
-    text = ""
-    with fitz.open(file_path) as doc:
-        for page in doc:
-            text += page.get_text()
-    return text.strip()
-
-def extract_text_from_docx(file_path):
-    doc = docx.Document(file_path)
-    return "\n".join([para.text for para in doc.paragraphs if para.text.strip()])
-
-def extract_resume_text(file_path):
-    if file_path.lower().endswith('.pdf'):
-        return extract_text_from_pdf(file_path)
-    elif file_path.lower().endswith('.docx'):
-        return extract_text_from_docx(file_path)
+# --- HELPERS ---
+def extract_text_from_file(file):
+    """Extract plain text from PDF or DOCX resumes."""
+    if file.filename.lower().endswith(".pdf"):
+        reader = PdfReader(file)
+        return "\n".join([page.extract_text() or "" for page in reader.pages])
+    elif file.filename.lower().endswith(".docx"):
+        doc = Document(file)
+        return "\n".join([para.text for para in doc.paragraphs])
     else:
         return ""
 
-def generate_recommendations_with_hf(resume_text, job_description):
-    prompt = f"""
-    You are a resume analysis assistant.
-    Analyze the following resume and provide 5 concise, useful, and actionable suggestions to improve it
-    for better ATS compatibility and job fit.
+def generate_recommendations(resume_text, job_description):
+    """Use OpenAI to generate resume recommendations."""
+    try:
+        prompt = f"""
+        You are an ATS (Applicant Tracking System) optimization assistant.
+        Based on the resume and job description below, give 3 detailed, actionable recommendations
+        to improve the resume so it has a higher chance of passing ATS screening.
 
-    Resume:
-    {resume_text}
+        Resume:
+        {resume_text}
 
-    Job Description:
-    {job_description}
+        Job Description:
+        {job_description}
+        """
 
-    Respond only with bullet points in plain text.
-    """
+        response = client.responses.create(
+            model="gpt-4o-mini",  # Safe for free-tier testing
+            input=prompt,
+            store=True,
+        )
 
-    response = requests.post(HUGGINGFACE_API_URL, headers=headers, json={"inputs": prompt})
+        return response.output_text.strip().split("\n")
+    except Exception as e:
+        return [f"Error generating recommendations: {str(e)}"]
 
-    if response.status_code == 200:
-        result = response.json()
-        if isinstance(result, list) and 'generated_text' in result[0]:
-            lines = result[0]['generated_text'].split("\n")
-            return [line.strip("-• ") for line in lines if line.strip()]
-    return ["Unable to generate recommendations at the moment. Please try again later."]
-
-# === Main route ===
-
-@app.route('/api/analyze', methods=['POST'])
+# --- API ROUTES ---
+@app.route("/analyze", methods=["POST"])
 def analyze_resume():
-    file = request.files.get('resume')
-    job_desc = request.form.get('job_description')
+    """
+    POST request should include:
+    - 'resume' file (.pdf or .docx)
+    - 'job_description' text
+    """
+    try:
+        if "resume" not in request.files or "job_description" not in request.form:
+            return jsonify({"error": "Missing resume file or job description"}), 400
 
-    if not file or not job_desc:
-        return jsonify({'error': 'Missing resume or job description'}), 400
+        resume_file = request.files["resume"]
+        job_description = request.form["job_description"]
 
-    filename = secure_filename(file.filename)
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    file.save(filepath)
+        resume_text = extract_text_from_file(resume_file)
 
-    resume_text = extract_resume_text(filepath)
-    if not resume_text:
-        return jsonify({'error': 'Could not extract text from resume'}), 500
+        if not resume_text.strip():
+            return jsonify({"error": "Unable to extract text from resume"}), 400
 
-    recommendations = generate_recommendations_with_hf(resume_text, job_desc)
-
-    return jsonify({
-        "ats_score": 57,  # Placeholder, will be dynamic in later phases
-        "job_fit_score": 62,  # Placeholder
-        "feedback": [
+        # Basic fake ATS scoring
+        ats_score = 57  # Placeholder scoring logic
+        feedback = [
             "Use standard section headings like 'Experience' and 'Education'.",
             "Avoid graphics, tables, and non-standard fonts.",
             "Include measurable achievements and keywords from the job description."
-        ],
-        "recommendations": recommendations
-    })
+        ]
+        job_fit_score = 62  # Placeholder
 
-# === Run server ===
+        # AI recommendations
+        recommendations = generate_recommendations(resume_text, job_description)
 
-if __name__ == '__main__':
+        return jsonify({
+            "ats_score": ats_score,
+            "feedback": feedback,
+            "job_fit_score": job_fit_score,
+            "recommendations": recommendations
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# --- RUN ---
+if __name__ == "__main__":
     app.run(debug=True)
