@@ -6,74 +6,105 @@
  * Author: <a href="https://mazindigital.com">Mazin Digital</a> | <a href="https://github.com/woories19">GitHub</a>
 */
 
-if ( ! defined( 'ABSPATH' ) ) exit;
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
 
+// Constants
 define( 'JOBREADY_PATH', plugin_dir_path( __FILE__ ) );
 define( 'JOBREADY_URL', plugin_dir_url( __FILE__ ) );
+define( 'JOBREADY_LOG_DIR', JOBREADY_PATH . 'assets/logs/' );
+define( 'JOBREADY_LOG_FILE', JOBREADY_LOG_DIR . 'error.log' );
 
-// --------------------
-// Safe Include Helper
-// --------------------
-function jobready_safe_include( $file_path, $description ) {
-    if ( file_exists( $file_path ) ) {
-        require_once $file_path;
+// Simple logger (append with timestamp). Attempts to create logs folder.
+function jobready_log( $message ) {
+    // Normalize message
+    $time = gmdate( 'Y-m-d H:i:s' );
+    $entry = "[$time] $message\n";
+
+    // Try to create logs dir if missing
+    if ( ! file_exists( JOBREADY_LOG_DIR ) ) {
+        @mkdir( JOBREADY_LOG_DIR, 0755, true );
+        if ( ! file_exists( JOBREADY_LOG_DIR ) ) {
+            // Fallback to WP error log
+            error_log( "[JobReady] Could not create log dir: " . JOBREADY_LOG_DIR );
+            error_log( "[JobReady] $entry" );
+            return;
+        }
+    }
+
+    // Append to file
+    @file_put_contents( JOBREADY_LOG_FILE, $entry, FILE_APPEND | LOCK_EX );
+}
+
+// Boot sequence: load includes if present
+jobready_log( 'Boot: JobReady plugin initializing.' );
+
+$includes = [
+    'includes/settings-page.php',
+    'includes/enqueue-scripts.php',
+    // widget is loaded later inside jobready_init after Elementor checks
+];
+
+foreach ( $includes as $inc ) {
+    $path = JOBREADY_PATH . $inc;
+    if ( file_exists( $path ) ) {
+        require_once $path;
+        jobready_log( "Included: $inc" );
     } else {
-        error_log( "[JobReady] ERROR: Missing file - {$description} ({$file_path})" );
+        jobready_log( "Missing include file: $inc" );
     }
 }
 
-// --------------------
-// Load Settings & Scripts (with checks)
-// --------------------
-jobready_safe_include( JOBREADY_PATH . 'includes/settings-page.php', 'Settings Page' );
-jobready_safe_include( JOBREADY_PATH . 'includes/enqueue-scripts.php', 'Enqueue Scripts' );
-
-// --------------------
-// Elementor Dependency Check
-// --------------------
+// Initialize plugin only after plugins_loaded
 function jobready_init() {
-    // 1. Elementor presence
+    jobready_log( 'jobready_init called.' );
+
+    // Check Elementor
     if ( ! did_action( 'elementor/loaded' ) ) {
         add_action( 'admin_notices', function() {
-            echo '<div class="notice notice-error"><p><strong>JobReady</strong> requires Elementor to be installed and activated.</p></div>';
-        });
-        error_log( "[JobReady] ERROR: Elementor not loaded" );
+            echo '<div class="notice notice-warning"><p><strong>JobReady:</strong> Elementor is not active. The JobReady widget requires Elementor.</p></div>';
+        } );
+        jobready_log( 'Elementor not loaded. Widget will not be registered.' );
         return;
     }
 
-    // 2. Elementor version check
-    $required_version = '3.0.0';
-    $current_version  = ELEMENTOR_VERSION;
-
-    if ( version_compare( $current_version, $required_version, '<' ) ) {
-        add_action( 'admin_notices', function() use ( $required_version, $current_version ) {
-            echo '<div class="notice notice-error"><p><strong>JobReady</strong> requires Elementor version ' . esc_html( $required_version ) . ' or higher. Current version: ' . esc_html( $current_version ) . '.</p></div>';
-        });
-        error_log( "[JobReady] ERROR: Elementor version too low. Required: {$required_version}, Current: {$current_version}" );
-        return;
+    // Version check for Elementor if constant exists
+    if ( defined( 'ELEMENTOR_VERSION' ) ) {
+        $required = '3.0.0';
+        if ( version_compare( ELEMENTOR_VERSION, $required, '<' ) ) {
+            add_action( 'admin_notices', function() use ( $required ) {
+                echo '<div class="notice notice-error"><p><strong>JobReady:</strong> Requires Elementor >= ' . esc_html( $required ) . '.</p></div>';
+            } );
+            jobready_log( "Elementor version too low: " . ELEMENTOR_VERSION );
+            return;
+        }
     }
 
-    // 3. Register widget
-    add_action( 'elementor/widgets/register', 'jobready_register_widget' );
+    // Register widget registration hook
+    add_action( 'elementor/widgets/register', 'jobready_register_widget_safe' );
+    jobready_log( 'Registered elementor/widgets/register hook.' );
 }
 add_action( 'plugins_loaded', 'jobready_init' );
 
-// --------------------
-// Register Elementor Widget
-// --------------------
-function jobready_register_widget( $widgets_manager ) {
+// Safe widget registration function
+function jobready_register_widget_safe( $widgets_manager ) {
     $widget_file = JOBREADY_PATH . 'includes/widget-jobready.php';
+    if ( ! file_exists( $widget_file ) ) {
+        jobready_log( 'widget-jobready.php not found when attempting to register widget.' );
+        return;
+    }
 
-    if ( file_exists( $widget_file ) ) {
-        require_once $widget_file;
+    require_once $widget_file;
 
-        if ( class_exists( 'JobReady_Widget' ) ) {
+    if ( class_exists( 'JobReady_Widget' ) ) {
+        try {
             $widgets_manager->register( new \JobReady_Widget() );
-            error_log( "[JobReady] SUCCESS: JobReady_Widget registered" );
-        } else {
-            error_log( "[JobReady] ERROR: JobReady_Widget class not found after including widget-jobready.php" );
+            jobready_log( 'JobReady_Widget registered successfully.' );
+        } catch ( Exception $e ) {
+            jobready_log( 'Exception registering widget: ' . $e->getMessage() );
         }
     } else {
-        error_log( "[JobReady] ERROR: widget-jobready.php file not found in includes/" );
+        jobready_log( 'JobReady_Widget class does not exist after include.' );
     }
 }

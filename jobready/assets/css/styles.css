@@ -1,29 +1,50 @@
 .jobready-widget {
-    border: 1px solid #ddd;
-    padding: 15px;
+    border: 1px solid #e6e6e6;
+    padding: 16px;
     border-radius: 8px;
-    background: #fafafa;
+    background: #fff;
+    max-width: 800px;
 }
+
+.jobready-widget .jobready-field {
+    margin-bottom: 12px;
+}
+
+.jobready-widget label {
+    display:block;
+    margin-bottom:6px;
+    font-weight:600;
+}
+
+.jobready-widget input[type="file"] {
+    display:block;
+}
+
 .jobready-widget textarea {
     width: 100%;
-    height: 100px;
-    margin-bottom: 10px;
+    min-height: 120px;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
 }
-.jobready-widget button {
-    background: #2271b1;
-    color: white;
-    padding: 8px 12px;
+
+.jobready-widget .jobready-submit {
+    background: #5b3df7;
+    color: #fff;
     border: none;
-    border-radius: 4px;
+    padding: 10px 16px;
+    border-radius: 6px;
     cursor: pointer;
 }
-.jobready-widget button:hover {
-    background: #1a5a85;
+
+.jobready-widget .jobready-submit:hover {
+    background: #472bcf;
 }
+
 .jobready-results {
-    margin-top: 15px;
-    padding: 10px;
-    background: white;
-    border: 1px solid #ddd;
-    min-height: 50px;
+    margin-top: 14px;
+    padding: 12px;
+    background: #fafafa;
+    border-radius: 6px;
+    border: 1px solid #eee;
 }

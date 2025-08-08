@@ -1,10 +1,12 @@
 import os
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from PyPDF2 import PdfReader
 from docx import Document
 from openai import OpenAI
 
 app = Flask(__name__)
+CORS(app, resources={r"/*": {"origins": "https://mazindigital.com"}})
 
 # --- CONFIG ---
 OPENAI_API_KEY = "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"  # Replace with your key directly
