@@ -4,31 +4,25 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 function jobready_enqueue_assets() {
-    // CSS
+    // Force jQuery first
+    wp_enqueue_script('jquery');
+    
+    // Then styles
     wp_enqueue_style(
         'jobready-styles',
         JOBREADY_URL . 'assets/css/styles.css',
         array(),
-        '1.1.0'
+        '1.1.3',
+        'all'  // Add media type
     );
 
-    // JS
+    // Then our script
     wp_enqueue_script(
         'jobready-script',
         JOBREADY_URL . 'assets/js/script.js',
-        array( 'jquery' ),
-        '1.1.0',
+        array('jquery'),
+        '1.1.3',
         true
-    );
-
-    // Localize global API URL setting
-    $global_api = get_option( 'jobready_api_url', '' );
-    wp_localize_script(
-        'jobready-script',
-        'jobreadySettings',
-        array(
-            'apiUrl' => untrailingslashit( $global_api )
-        )
     );
 }
 add_action( 'wp_enqueue_scripts', 'jobready_enqueue_assets' );

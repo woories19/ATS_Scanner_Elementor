@@ -1,3 +1,5 @@
+## Ai-Version
+
 # Ignore Python venv
 venv/
 
@@ -19,3 +21,9 @@ uploads/*
 # Ignore OS files
 .DS_Store
 Thumbs.db
+
+# Ignore Concept Version
+wordpress-plugin.old/
+
+# Ignore test builds stored locally
+local-builds/

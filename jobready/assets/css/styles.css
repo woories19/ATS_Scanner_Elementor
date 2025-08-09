@@ -1,50 +1,212 @@
-.jobready-widget {
-    border: 1px solid #e6e6e6;
-    padding: 16px;
-    border-radius: 8px;
-    background: #fff;
-    max-width: 800px;
-}
-
-.jobready-widget .jobready-field {
+.jobready-scores {
+    display: flex;
+    gap: 28px;
+    align-items: center;
     margin-bottom: 12px;
 }
 
-.jobready-widget label {
-    display:block;
-    margin-bottom:6px;
-    font-weight:600;
+.jr-circle-wrap {
+    text-align: center;
+    width: 84px;
 }
 
-.jobready-widget input[type="file"] {
-    display:block;
+.circular-chart {
+    width: 84px;
+    height: 84px;
+    display: block;
+    margin: 0 auto 6px;
 }
 
-.jobready-widget textarea {
+.circle-bg {
+    fill: none;
+    stroke: #eee;
+    stroke-width: 3.8;
+}
+
+.circle {
+    fill: none;
+    stroke: #6a5cff;
+    stroke-width: 3.2;
+    stroke-linecap: round;
+    transition: stroke-dasharray 0.8s ease;
+    animation: progress 1s ease-out forwards;
+    stroke-dasharray: 0, 100;
+}
+
+.percentage {
+    font-family: Arial, sans-serif;
+    font-size: 10px;
+    text-anchor: middle;
+    dominant-baseline: middle;
+    fill: #333;
+}
+
+.jr-label {
+    font-size: 13px;
+    color: #333;
+    margin-top: 4px;
+}
+
+.blurred {
+    filter: blur(4px);
+    position: relative;
+}
+
+.blur-overlay {
+    text-align: center;
+    margin-top: 10px;
+}
+
+.jobready-pro-btn {
+    background: #00acc1;
+    color: #fff;
+    padding: 8px 14px;
+    border-radius: 5px;
+    text-decoration: none;
+}
+
+.jobready-pro-btn:hover {
+    background: #008b99;
+}
+
+@keyframes progress {
+    from {
+        stroke-dasharray: 0, 100;
+    }
+}
+
+/* Additional styles for keyword analysis */
+.jobready-widget h5 {
+    margin: 10px 0 5px;
+    color: #333;
+    font-size: 14px;
+}
+
+.jobready-widget ul {
+    margin: 0 0 15px;
+    padding-left: 20px;
+}
+
+.jobready-widget li {
+    margin-bottom: 5px;
+    line-height: 1.4;
+}
+
+.keyword-analysis {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #eee;
+}
+
+/* Add error states */
+.jobready-error {
+    display: block !important;
+    color: #dc3545;
+    padding: 8px 12px;
+    margin: 8px 0;
+    border-radius: 4px;
+    background: rgba(220, 53, 69, 0.1);
+}
+
+/* Add loading state */
+.jobready-loading {
+    text-align: center;
+    padding: 20px;
+}
+
+.jobready-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #6a5cff;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spinner 0.8s linear infinite;
+}
+
+@keyframes spinner {
+    to { transform: rotate(360deg); }
+}
+
+/* Add form styling */
+.jobready-form {
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.jobready-field {
+    margin-bottom: 16px;
+}
+
+.jobready-field label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.jobready-field input[type="file"] {
     width: 100%;
-    min-height: 120px;
     padding: 8px;
     border: 1px solid #ddd;
-    border-radius: 6px;
+    border-radius: 4px;
 }
 
-.jobready-widget .jobready-submit {
-    background: #5b3df7;
-    color: #fff;
-    border: none;
-    padding: 10px 16px;
-    border-radius: 6px;
-    cursor: pointer;
+.jobready-field textarea {
+    width: 100%;
+    min-height: 120px;
+    padding: 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    resize: vertical;
 }
 
-.jobready-widget .jobready-submit:hover {
-    background: #472bcf;
+/* Add responsive styles */
+@media (max-width: 768px) {
+    .jobready-scores {
+        flex-direction: column;
+        gap: 16px;
+    }
+    
+    .jr-circle-wrap {
+        width: 72px;
+    }
+    
+    .circular-chart {
+        width: 72px;
+        height: 72px;
+    }
+    
+    .jobready-field textarea {
+        min-height: 100px;
+    }
+}
+
+/* Add explicit display properties */
+.jobready-basic,
+.jobready-ai {
+    display: block;
+    margin: 15px 0;
+}
+
+.jobready-basic li,
+.jobready-ai li {
+    display: list-item;
+    margin-bottom: 8px;
 }
 
 .jobready-results {
-    margin-top: 14px;
-    padding: 12px;
-    background: #fafafa;
+    display: block !important; /* Force display */
+    visibility: visible !important; /* Ensure visibility */
+    min-height: 50px;
+    margin-top: 20px;
+    opacity: 1 !important;
+}
+
+.jobready-keywords {
+    margin: 18px 0 10px 0;
+    padding: 12px 10px;
+    background: #f7f7fa;
     border-radius: 6px;
-    border: 1px solid #eee;
+    font-size: 15px;
+    color: #333;
 }

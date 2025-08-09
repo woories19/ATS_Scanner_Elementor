@@ -8,11 +8,12 @@ class JobReady_Widget extends \Elementor\Widget_Base {
     }
 
     public function get_title() {
-        return 'JobReady Resume Scanner';
+        return 'JobReady Resume Analyzer';
     }
 
     public function get_icon() {
-        return 'eicon-form-horizontal';
+        // Use a commonly available Elementor icon
+        return 'eicon-document-file';
     }
 
     public function get_categories() {
@@ -30,8 +31,6 @@ class JobReady_Widget extends \Elementor\Widget_Base {
             [
                 'label' => __( 'Use Custom API URL', 'jobready' ),
                 'type' => \Elementor\Controls_Manager::SWITCHER,
-                'label_on' => __( 'Yes', 'jobready' ),
-                'label_off' => __( 'No', 'jobready' ),
                 'return_value' => 'yes',
                 'default' => 'no',
             ]
@@ -42,8 +41,22 @@ class JobReady_Widget extends \Elementor\Widget_Base {
             [
                 'label' => __( 'Custom API URL', 'jobready' ),
                 'type' => \Elementor\Controls_Manager::TEXT,
-                'placeholder' => __( 'https://your-api.example.com', 'jobready' ),
+                'placeholder' => __( 'https://your-api.example.com (no trailing slash)', 'jobready' ),
                 'condition' => [ 'use_custom_api' => 'yes' ],
+            ]
+        );
+
+        $this->add_control(
+            'professional_feedback_url',
+            [
+                'label' => __( 'Professional Feedback URL', 'jobready' ),
+                'type' => \Elementor\Controls_Manager::URL,
+                'placeholder' => __( 'https://yourdomain.com/professional-feedback', 'jobready' ),
+                'default' => [
+                    'url' => '',
+                    'is_external' => true,
+                    'nofollow' => true,
+                ],
             ]
         );
 
@@ -53,28 +66,29 @@ class JobReady_Widget extends \Elementor\Widget_Base {
     protected function render() {
         $settings = $this->get_settings_for_display();
 
-        // Resolve API url: custom if enabled, else global
+        // Determine API URL: custom overrides global if selected
         $global_api = untrailingslashit( get_option( 'jobready_api_url', '' ) );
         $api_url = $global_api;
         if ( isset( $settings['use_custom_api'] ) && $settings['use_custom_api'] === 'yes' && ! empty( $settings['custom_api_url'] ) ) {
             $api_url = untrailingslashit( esc_url( $settings['custom_api_url'] ) );
         }
 
-        // Use a unique ID for this widget instance to avoid collisions
-        $uid = uniqid( 'jobready_' );
+        $feedback_url = ! empty( $settings['professional_feedback_url']['url'] ) ? esc_url( $settings['professional_feedback_url']['url'] ) : '';
 
-        // Render form - note name attributes must match backend: 'resume' and 'job_description'
+        // Unique ID so multiple widgets don't conflict
+        $uid = uniqid( 'jobready_' );
         ?>
-        <div class="jobready-widget" data-api-url="<?php echo esc_attr( $api_url ); ?>" id="<?php echo esc_attr( $uid ); ?>">
-            <form class="jobready-form" enctype="multipart/form-data">
+
+        <div id="<?php echo esc_attr( $uid ); ?>" class="jobready-widget" data-api-url="<?php echo esc_attr( $api_url ); ?>" data-feedback-url="<?php echo esc_attr( $feedback_url ); ?>">
+            <form class="jobready-form" enctype="multipart/form-data" novalidate>
                 <div class="jobready-field">
-                    <label><?php esc_html_e( 'Upload Resume (PDF or DOCX)', 'jobready' ); ?></label>
-                    <input type="file" name="resume" accept=".pdf,.docx" required />
+                    <label for="<?php echo esc_attr( $uid . '_resume' ); ?>"><?php esc_html_e( 'Upload Resume (PDF or DOCX)', 'jobready' ); ?></label>
+                    <input id="<?php echo esc_attr( $uid . '_resume' ); ?>" type="file" name="resume" accept=".pdf,.docx" required />
                 </div>
 
                 <div class="jobready-field">
-                    <label><?php esc_html_e( 'Job Description', 'jobready' ); ?></label>
-                    <textarea name="job_description" rows="6" placeholder="<?php esc_attr_e( 'Paste the job description here...', 'jobready' ); ?>" required></textarea>
+                    <label for="<?php echo esc_attr( $uid . '_jobdesc' ); ?>"><?php esc_html_e( 'Job Description', 'jobready' ); ?></label>
+                    <textarea id="<?php echo esc_attr( $uid . '_jobdesc' ); ?>" name="job_description" rows="6" placeholder="<?php esc_attr_e( 'Paste the job description here...', 'jobready' ); ?>" required></textarea>
                 </div>
 
                 <div class="jobready-actions">
@@ -82,8 +96,9 @@ class JobReady_Widget extends \Elementor\Widget_Base {
                 </div>
             </form>
 
-            <div class="jobready-results"></div>
+            <div class="jobready-results" aria-live="polite" style="margin-top:16px;"></div>
         </div>
+
         <?php
     }
 }
