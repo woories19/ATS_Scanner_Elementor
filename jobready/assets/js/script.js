@@ -77,6 +77,10 @@
                     // Recommendations
                     var basicRecs = Array.isArray(data.basic_recommendations) ? data.basic_recommendations : [];
                     var aiRecs = Array.isArray(data.ai_recommendations) ? data.ai_recommendations : [];
+                    // Remove duplicates from AI Recommendations if they exist in Basic
+                    aiRecs = aiRecs.filter(function(rec){
+                        return basicRecs.indexOf(rec) === -1;
+                    });
 
                     // Keyword and other scores
                     var keywordMatch = '';
@@ -166,13 +170,17 @@
         }
 
         function animateCircle($widget, key, value) {
-            console.log(`Attempting to animate circle: ${key} with value: ${value}`);
             var $circle = $widget.find(`path.circle[data-key="${key}"]`);
-            if (!$circle.length) {
-                console.error(`Circle path not found for key: ${key}`);
-                return;
-            }
-            $circle.attr('stroke-dasharray', `${value},100`);
+            if (!$circle.length) return;
+            var radius = 15.9155;
+            var circumference = 2 * Math.PI * radius;
+            $circle.attr('stroke-dasharray', circumference);
+            $circle.attr('stroke-dashoffset', circumference);
+            setTimeout(function() {
+                $circle.css('transition', 'stroke-dashoffset 1.2s ease');
+                var offset = circumference - (value / 100) * circumference;
+                $circle.attr('stroke-dashoffset', offset);
+            }, 100);
         }
 
         // basic helpers to prevent XSS in inserted HTML

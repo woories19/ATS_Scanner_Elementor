@@ -16,7 +16,6 @@ import re
 import json
 import traceback
 from datetime import datetime
-from collections import Counter
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -43,7 +42,7 @@ ALLOWED_ORIGINS = [
 ]
 
 # OpenAI key (recommended: set via env var in production)
-OPENAI_API_KEY = "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"  # Replace with your key directly
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 OPENAI_MODEL = "gpt-4o-mini"  # change to preferred model (gpt-5-nano after billing etc.)
 
 # Create minimal folders
@@ -334,3 +333,4 @@ def index():
 if __name__ == "__main__":
     # Dev: don't use in production; PythonAnywhere uses WSGI
     app.run(host="0.0.0.0", port=5000, debug=True)
+# Note: In production, use a WSGI server like Gunicorn or uWSGI.

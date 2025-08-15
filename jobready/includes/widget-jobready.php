@@ -12,7 +12,6 @@ class JobReady_Widget extends \Elementor\Widget_Base {
     }
 
     public function get_icon() {
-        // Use a commonly available Elementor icon
         return 'eicon-document-file';
     }
 
@@ -21,6 +20,7 @@ class JobReady_Widget extends \Elementor\Widget_Base {
     }
 
     protected function register_controls() {
+        // Only content controls (no style controls)
         $this->start_controls_section(
             'section_content',
             [ 'label' => __( 'Settings', 'jobready' ) ]
@@ -66,7 +66,6 @@ class JobReady_Widget extends \Elementor\Widget_Base {
     protected function render() {
         $settings = $this->get_settings_for_display();
 
-        // Determine API URL: custom overrides global if selected
         $global_api = untrailingslashit( get_option( 'jobready_api_url', '' ) );
         $api_url = $global_api;
         if ( isset( $settings['use_custom_api'] ) && $settings['use_custom_api'] === 'yes' && ! empty( $settings['custom_api_url'] ) ) {
@@ -74,8 +73,6 @@ class JobReady_Widget extends \Elementor\Widget_Base {
         }
 
         $feedback_url = ! empty( $settings['professional_feedback_url']['url'] ) ? esc_url( $settings['professional_feedback_url']['url'] ) : '';
-
-        // Unique ID so multiple widgets don't conflict
         $uid = uniqid( 'jobready_' );
         ?>
 
@@ -98,7 +95,6 @@ class JobReady_Widget extends \Elementor\Widget_Base {
 
             <div class="jobready-results" aria-live="polite" style="margin-top:16px;"></div>
         </div>
-
         <?php
     }
 }
