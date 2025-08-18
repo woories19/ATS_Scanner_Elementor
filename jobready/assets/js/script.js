@@ -9,28 +9,23 @@
     debug('Script loaded');
     debug('jQuery version:', $.fn.jquery);
 
-    $(document).ready(function(){
 
-        // Delegated submit handler (works in editor + frontend)
+    $(document).ready(function(){
+        // State for leadgen
+        let leadgenData = null;
+
+        // Step 1: Resume/Jobdesc submit
         $(document).on('submit', '.jobready-form', function(e){
             e.preventDefault();
-
             var $form = $(this);
             var $widget = $form.closest('.jobready-widget');
             var results = $widget.find('.jobready-results');
-
-            // Resolve API URL: widget data-api-url or global localized script var
             var apiUrl = $widget.data('api-url') || (typeof jobreadySettings !== 'undefined' ? jobreadySettings.apiUrl : '');
             apiUrl = apiUrl ? apiUrl.replace(/\/$/, '') : '';
-
-            // If empty, tell user
             if (!apiUrl) {
                 results.html('<p style="color:red;">API URL not configured. Set it in JobReady settings or widget.</p>');
-                console.error('JobReady: Missing API URL for widget', $widget.attr('id'));
                 return;
             }
-
-            // Basic validation and formdata
             var fileInput = $form.find('input[name="resume"]')[0];
             if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
                 results.html('<p style="color:red;">Please attach a resume (PDF or DOCX).</p>');
@@ -41,103 +36,53 @@
                 results.html('<p style="color:red;">Please enter the job description.</p>');
                 return;
             }
+            // Save for next step
+            leadgenData = new FormData();
+            leadgenData.append('resume', fileInput.files[0]);
+            leadgenData.append('job_description', jobDesc);
+            // Show name/email modal
+            showLeadgenModal($widget, results);
+        });
 
-            var fd = new FormData($form[0]); // automatically pulls file & job_description
-
-            // show spinner / loading
+        // Step 2: Name/Email submit
+        $(document).on('submit', '.jobready-leadgen-form', function(e){
+            e.preventDefault();
+            var $modal = $(this).closest('.jobready-leadgen-modal');
+            var $widget = $modal.closest('.jobready-widget');
+            var results = $widget.find('.jobready-results');
+            var name = $modal.find('input[name="name"]').val() || '';
+            var email = $modal.find('input[name="email"]').val() || '';
+            if (!name.trim() || !email.trim()) {
+                $modal.find('.jobready-leadgen-error').text('Please enter your name and email.');
+                return;
+            }
+            $modal.find('.jobready-leadgen-error').text('');
+            // Add to FormData
+            leadgenData.append('name', name);
+            leadgenData.append('email', email);
+            // Hide modal, show loading
+            $modal.remove();
             results.html('<p>Processing... please wait.</p>');
-
+            var apiUrl = $widget.data('api-url') || (typeof jobreadySettings !== 'undefined' ? jobreadySettings.apiUrl : '');
+            apiUrl = apiUrl ? apiUrl.replace(/\/$/, '') : '';
             $.ajax({
                 url: apiUrl + '/analyze',
                 type: 'POST',
-                data: fd,
+                data: leadgenData,
                 processData: false,
                 contentType: false,
-                timeout: 30000, // 30 second timeout
-                beforeSend: function() {
-                    results.html(`
-                        <div class="jobready-loading">
-                            <div class="jobready-spinner"></div>
-                            <p>Analyzing your resume...</p>
-                        </div>
-                    `);
-                },
+                timeout: 30000,
                 success: function(data){
-                    // Validate response
                     if (!data || typeof data !== 'object') {
                         results.html('<div class="jobready-error">Invalid server response</div>');
                         return;
                     }
-
-                    // Ensure numbers and clamp for animation
-                    var ats = Math.max(0, Math.min(100, Math.round(Number(data.ats_score || 0))));
-                    var fit = Math.max(0, Math.min(100, Math.round(Number(data.job_fit_score || 0))));
-                    debug('Creating circles with scores:', {ats: ats, fit: fit});
-
-                    // Recommendations
-                    var basicRecs = Array.isArray(data.basic_recommendations) ? data.basic_recommendations : [];
-                    var aiRecs = Array.isArray(data.ai_recommendations) ? data.ai_recommendations : [];
-                    // Remove duplicates from AI Recommendations if they exist in Basic
-                    aiRecs = aiRecs.filter(function(rec){
-                        return basicRecs.indexOf(rec) === -1;
-                    });
-
-                    // Keyword and other scores
-                    var keywordMatch = '';
-                    if (typeof data.keywords_match_percent !== 'undefined') {
-                        keywordMatch += `<h4>Keyword Match</h4><p>Match Rate: ${data.keywords_match_percent}%</p>`;
-                    }
-                    if (typeof data.section_completeness_percent !== 'undefined') {
-                        keywordMatch += `<h4>Section Completeness</h4><p>${data.section_completeness_percent}%</p>`;
-                    }
-                    if (typeof data.readability_percent !== 'undefined') {
-                        keywordMatch += `<h4>Readability</h4><p>${data.readability_percent}%</p>`;
-                    }
-
-                    // Build HTML
-                    var html = '';
-                    html += '<div class="jobready-scores">';
-                    html += makeCircleHtml('ATS Score', ats, 'ats');
-                    html += makeCircleHtml('Job Fit', fit, 'fit');
-                    html += '</div>';
-
-                    html += '<h4>Basic Recommendations</h4>';
-                    if (basicRecs.length) {
-                        html += '<ul class="jobready-basic">';
-                        basicRecs.forEach(function(b){ html += '<li>' + sanitizeHTML(b) + '</li>'; });
-                        html += '</ul>';
-                    } else {
-                        html += '<p>No basic recommendations available.</p>';
-                    }
-
-                    html += '<h4>AI Recommendations</h4>';
-                    if (aiRecs.length) {
-                        html += '<ul class="jobready-ai">';
-                        aiRecs.forEach(function(rec, index) {
-                            html += '<li class="' + (index > 0 ? 'ai-blur' : 'ai-visible') + '">' + escapeHtml(rec) + '</li>';
-                        });
-                        html += '</ul>';
-                    } else {
-                        html += '<p>No AI recommendations available.</p>';
-                    }
-
-                    if (keywordMatch) {
-                        html += `<div class="jobready-keywords">${keywordMatch}</div>`;
-                    }
-
-                    var feedbackUrl = $widget.data('feedback-url') || '';
-                    if (feedbackUrl) {
-                        html += '<div class="jobready-cta-wrap"><a class="jobready-cta" href="' + escapeAttr(feedbackUrl) + '" target="_blank" rel="noopener">Get Professional Feedback</a></div>';
-                    }
-
-                    results.html(html);
-                    animateCircle($widget, 'ats', ats);
-                    animateCircle($widget, 'fit', fit);
-                    resetForm($form);
+                    // Redirect to thank you page with scores
+                    var thankYouUrl = '/resume-submission/?ats=' + encodeURIComponent(data.ats_score) + '&fit=' + encodeURIComponent(data.job_fit_score);
+                    window.location.href = thankYouUrl;
                 },
                 error: function(xhr, status, err) {
                     let errorMessage = 'An error occurred while processing your request.';
-                    
                     if (status === 'timeout') {
                         errorMessage = 'Request timed out. Please try again.';
                     } else if (xhr.status === 413) {
@@ -145,13 +90,27 @@
                     } else if (xhr.status === 415) {
                         errorMessage = 'Invalid file type. Please upload PDF or DOCX only.';
                     }
-                    
                     results.html(`<div class="jobready-error">${errorMessage}</div>`);
-                    console.error('JobReady API Error:', {status, error: err, response: xhr.responseText});
                 }
             });
-
         });
+
+        function showLeadgenModal($widget, $results) {
+            // Remove any existing modal
+            $widget.find('.jobready-leadgen-modal').remove();
+            var modal = `
+                <div class="jobready-leadgen-modal">
+                  <form class="jobready-leadgen-form">
+                    <div class="jobready-leadgen-title">Almost done! Please enter your name and email to receive your full report.</div>
+                    <input type="text" name="name" placeholder="Your Name" required />
+                    <input type="email" name="email" placeholder="Your Email" required />
+                    <div class="jobready-leadgen-error"></div>
+                    <button type="submit" class="jobready-leadgen-submit">Get My Report</button>
+                  </form>
+                </div>
+            `;
+            $results.html(modal);
+        }
 
         // ---------- helpers ----------
         function makeCircleHtml(label, value, key) {
