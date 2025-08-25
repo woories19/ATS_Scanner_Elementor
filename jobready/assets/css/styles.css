@@ -1,367 +1,389 @@
-/* Leadgen Modal Styles */
-.jobready-leadgen-modal {
-    background: rgba(255,255,255,0.98);
-    border: 1px solid #e0e0e0;
-    border-radius: 10px;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.10);
-    max-width: 350px;
-    margin: 30px auto;
-    padding: 32px 24px 24px 24px;
-    text-align: center;
-    z-index: 100;
-}
-.jobready-leadgen-title {
-    font-size: 1.1em;
-    margin-bottom: 18px;
-    color: #222;
-    font-weight: 600;
-}
-.jobready-leadgen-form input[type="text"],
-.jobready-leadgen-form input[type="email"] {
-    width: 90%;
-    padding: 10px 12px;
-    margin-bottom: 12px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    font-size: 1em;
-}
-.jobready-leadgen-submit {
-    background: #2e7d32;
-    color: #fff;
-    border: none;
-    border-radius: 5px;
-    padding: 10px 24px;
-    font-size: 1em;
-    cursor: pointer;
-    margin-top: 8px;
-    transition: background 0.2s;
-}
-.jobready-leadgen-submit:hover {
-    background: #256026;
-}
-.jobready-leadgen-error {
-    color: #d32f2f;
-    font-size: 0.98em;
-    margin-bottom: 8px;
-    min-height: 18px;
+/**
+ * JobReady Resume Analyzer - Clean, Optimized CSS
+ * Modern, responsive design that adapts to any Elementor layout
+ */
+
+/* ==========================================================================
+   Base Styles & Variables
+   ========================================================================== */
+:root {
+    --jr-primary: #5944F9;
+    --jr-primary-hover: #4935E8;
+    --jr-success: #2e7d32;
+    --jr-success-hover: #256026;
+    --jr-error: #dc3545;
+    --jr-text: #333;
+    --jr-text-light: #666;
+    --jr-border: #ddd;
+    --jr-bg-light: #f7f7fa;
+    --jr-shadow: 0 2px 16px rgba(0,0,0,0.07);
+    --jr-radius: 8px;
+    --jr-transition: all 0.2s ease;
 }
 
-/* Thank You Page Styles (suggested, can be used in your thank you template) */
-.jobready-thankyou {
-    max-width: 420px;
-    margin: 40px auto;
-    background: #fff;
-    border-radius: 12px;
-    box-shadow: 0 2px 16px rgba(0,0,0,0.07);
-    padding: 36px 28px 32px 28px;
-    text-align: center;
-}
-.jobready-thankyou h2 {
-    color: #2e7d32;
-    margin-bottom: 18px;
-}
-.jobready-thankyou .jobready-scores {
-    display: flex;
-    justify-content: center;
-    gap: 32px;
-    margin-bottom: 18px;
-}
-.jobready-thankyou .jobready-score-label {
-    font-size: 1em;
-    color: #444;
-    margin-top: 6px;
-}
-.jobready-thankyou .jobready-score-value {
-    font-size: 2.2em;
-    font-weight: bold;
-    color: #2e7d32;
-}
-.jobready-actions {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    margin-top: 18px;
-}
-
-.jobready-scores {
-    display: flex;
-    gap: 28px;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 12px;
-}
-
-.jr-circle-wrap {
-    text-align: center;
+/* ==========================================================================
+   Widget Container
+   ========================================================================== */
+.jobready-widget {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    max-width: 100%;
     margin: 0 auto;
 }
 
-.circular-chart {
-    width: 84px;
-    height: 84px;
-    display: block;
-    margin: 0 auto 6px;
-}
-
-.circle-bg {
-    fill: none;
-    stroke: #eee;
-    stroke-width: 3.8;
-}
-
-.circle {
-    fill: none;
-    stroke: #6a5cff;
-    stroke-width: 3.2;
-    stroke-linecap: round;
-    transition: stroke-dasharray 0.8s ease;
-    animation: progress 1s ease-out forwards;
-    stroke-dasharray: 0, 100;
-}
-
-.percentage {
-    font-family: Arial, sans-serif;
-    font-size: 10px;
-    text-anchor: middle;
-    dominant-baseline: middle;
-    fill: #333;
-}
-
-.jr-label {
-    font-size: 13px;
-    color: #333;
-    margin-top: 4px;
-}
-
-.blurred {
-    filter: blur(4px);
-    position: relative;
-}
-
-.blur-overlay {
-    text-align: center;
-    margin-top: 10px;
-}
-
-.jobready-pro-btn {
-    background: #00acc1;
-    color: #fff;
-    padding: 8px 14px;
-    border-radius: 5px;
-    text-decoration: none;
-}
-
-.jobready-pro-btn:hover {
-    background: #008b99;
-}
-
-@keyframes progress {
-    from {
-        stroke-dasharray: 0, 100;
-    }
-}
-
-/* Additional styles for keyword analysis */
-.jobready-widget h5 {
-    margin: 10px 0 5px;
-    color: #333;
-    font-size: 14px;
-}
-
-.jobready-widget ul {
-    margin: 0 0 15px;
-    padding-left: 20px;
-}
-
-.jobready-widget li {
-    margin-bottom: 5px;
-    line-height: 1.4;
-}
-
-.keyword-analysis {
-    margin-top: 20px;
-    padding-top: 15px;
-    border-top: 1px solid #eee;
-}
-
-/* Add error states */
-.jobready-error {
-    display: block !important;
-    color: #dc3545;
-    padding: 8px 12px;
-    margin: 8px 0;
-    border-radius: 4px;
-    background: rgba(220, 53, 69, 0.1);
-}
-
-/* Add loading state */
-.jobready-loading {
-    text-align: center;
-    padding: 20px;
-}
-
-.jobready-spinner {
-    display: inline-block;
-    width: 20px;
-    height: 20px;
-    border: 2px solid #6a5cff;
-    border-top-color: transparent;
-    border-radius: 50%;
-    animation: spinner 0.8s linear infinite;
-}
-
-@keyframes spinner {
-    to { transform: rotate(360deg); }
-}
-
-/* Add form styling */
+/* ==========================================================================
+   Form Styles
+   ========================================================================== */
 .jobready-form {
     max-width: 600px;
     margin: 0 auto;
+    padding: 0;
 }
 
 .jobready-field {
-    margin-bottom: 16px;
+    margin-bottom: 20px;
 }
 
 .jobready-field label {
     display: block;
     margin-bottom: 8px;
-    font-weight: 500;
+    font-weight: 600;
+    color: var(--jr-text);
+    font-size: 14px;
 }
 
 .jobready-field input[type="file"] {
     width: 100%;
-    padding: 8px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    padding: 12px;
+    border: 2px dashed var(--jr-border);
+    border-radius: var(--jr-radius);
+    background: #fff;
+    cursor: pointer;
+    transition: var(--jr-transition);
+    font-size: 14px;
+}
+
+.jobready-field input[type="file"]:hover {
+    border-color: var(--jr-primary);
+    background: rgba(89, 68, 249, 0.02);
+}
+
+.jobready-field input[type="file"]:focus {
+    outline: none;
+    border-color: var(--jr-primary);
+    box-shadow: 0 0 0 3px rgba(89, 68, 249, 0.1);
 }
 
 .jobready-field textarea {
     width: 100%;
     min-height: 120px;
-    padding: 12px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
+    padding: 16px;
+    border: 2px solid var(--jr-border);
+    border-radius: var(--jr-radius);
     resize: vertical;
+    font-size: 14px;
+    line-height: 1.5;
+    transition: var(--jr-transition);
+    font-family: inherit;
 }
 
-/* Add responsive styles */
+.jobready-field textarea:focus {
+    outline: none;
+    border-color: var(--jr-primary);
+    box-shadow: 0 0 0 3px rgba(89, 68, 249, 0.1);
+}
+
+.jobready-field textarea::placeholder {
+    color: var(--jr-text-light);
+}
+
+/* ==========================================================================
+   Field Help Text
+   ========================================================================== */
+.jobready-field-help {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--jr-text-light);
+    font-style: italic;
+    line-height: 1.4;
+}
+
+/* ==========================================================================
+   Button Styles
+   ========================================================================== */
+.jobready-actions {
+    text-align: center;
+    margin-top: 24px;
+}
+
+.jobready-submit {
+    background: var(--jr-primary);
+    color: #fff;
+    border: none;
+    border-radius: var(--jr-radius);
+    padding: 14px 32px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--jr-transition);
+    min-width: 180px;
+    box-shadow: 0 2px 8px rgba(89, 68, 249, 0.15);
+}
+
+.jobready-submit:hover {
+    background: var(--jr-primary-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(89, 68, 249, 0.25);
+}
+
+.jobready-submit:active {
+    transform: translateY(0);
+}
+
+.jobready-submit:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* ==========================================================================
+   Lead Generation Modal
+   ========================================================================== */
+.jobready-leadgen-modal {
+    background: rgba(255, 255, 255, 0.98);
+    border: 1px solid var(--jr-border);
+    border-radius: 12px;
+    box-shadow: var(--jr-shadow);
+    max-width: 400px;
+    margin: 30px auto;
+    padding: 32px 24px;
+    text-align: center;
+    backdrop-filter: blur(10px);
+}
+
+.jobready-leadgen-title {
+    font-size: 18px;
+    margin-bottom: 24px;
+    color: var(--jr-text);
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.jobready-leadgen-form input[type="text"],
+.jobready-leadgen-form input[type="email"] {
+    width: 100%;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+    border: 2px solid var(--jr-border);
+    border-radius: var(--jr-radius);
+    font-size: 16px;
+    transition: var(--jr-transition);
+    box-sizing: border-box;
+}
+
+.jobready-leadgen-form input:focus {
+    outline: none;
+    border-color: var(--jr-primary);
+    box-shadow: 0 0 0 3px rgba(89, 68, 249, 0.1);
+}
+
+.jobready-leadgen-submit {
+    background: var(--jr-success);
+    color: #fff;
+    border: none;
+    border-radius: var(--jr-radius);
+    padding: 14px 32px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: var(--jr-transition);
+    width: 100%;
+}
+
+.jobready-leadgen-submit:hover {
+    background: var(--jr-success-hover);
+    transform: translateY(-1px);
+}
+
+.jobready-leadgen-error {
+    color: var(--jr-error);
+    font-size: 14px;
+    margin-bottom: 16px;
+    min-height: 20px;
+    font-weight: 500;
+}
+
+/* ==========================================================================
+   Feedback Link
+   ========================================================================== */
+.jobready-feedback-link {
+    text-align: center;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--jr-border);
+}
+
+.jobready-feedback-btn {
+    display: inline-block;
+    background: transparent;
+    color: var(--jr-primary);
+    border: 2px solid var(--jr-primary);
+    border-radius: var(--jr-radius);
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: var(--jr-transition);
+}
+
+.jobready-feedback-btn:hover {
+    background: var(--jr-primary);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(89, 68, 249, 0.15);
+}
+
+/* ==========================================================================
+   Results & Loading States
+   ========================================================================== */
+.jobready-results {
+    margin-top: 24px;
+    min-height: 50px;
+    text-align: center;
+}
+
+.jobready-loading {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--jr-text-light);
+}
+
+.jobready-spinner {
+    display: inline-block;
+    width: 24px;
+    height: 24px;
+    border: 3px solid var(--jr-primary);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: jr-spin 0.8s linear infinite;
+    margin-bottom: 16px;
+}
+
+@keyframes jr-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+   Error States
+   ========================================================================== */
+.jobready-error {
+    display: block;
+    color: var(--jr-error);
+    padding: 12px 16px;
+    margin: 16px 0;
+    border-radius: var(--jr-radius);
+    background: rgba(220, 53, 69, 0.1);
+    border: 1px solid rgba(220, 53, 69, 0.2);
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* ==========================================================================
+   Responsive Design
+   ========================================================================== */
 @media (max-width: 768px) {
-    .jobready-scores {
-        flex-direction: column;
-        gap: 16px;
-    }
-    
-    .jr-circle-wrap {
-        width: 72px;
-    }
-    
-    .circular-chart {
-        width: 72px;
-        height: 72px;
+    .jobready-form {
+        padding: 0 16px;
     }
     
     .jobready-field textarea {
         min-height: 100px;
+        padding: 12px;
+    }
+    
+    .jobready-submit {
+        width: 100%;
+        padding: 16px 24px;
+    }
+    
+    .jobready-leadgen-modal {
+        margin: 20px 16px;
+        padding: 24px 20px;
+    }
+    
+    .jobready-leadgen-title {
+        font-size: 16px;
+        margin-bottom: 20px;
+    }
+    
+    .jobready-feedback-link {
+        margin-top: 20px;
+        padding-top: 16px;
     }
 }
 
-/* Add explicit display properties */
-.jobready-basic,
-.jobready-ai {
-    display: block;
-    margin: 15px 0;
+@media (max-width: 480px) {
+    .jobready-field {
+        margin-bottom: 16px;
+    }
+    
+    .jobready-field label {
+        font-size: 13px;
+    }
+    
+    .jobready-field input[type="file"],
+    .jobready-field textarea {
+        padding: 10px;
+        font-size: 14px;
+    }
+    
+    .jobready-submit {
+        font-size: 15px;
+        padding: 14px 20px;
+    }
+    
+    .jobready-field-help {
+        font-size: 11px;
+    }
 }
 
-.jobready-basic li,
-.jobready-ai li {
-    display: list-item;
-    margin-bottom: 8px;
+/* ==========================================================================
+   Elementor Integration Helpers
+   ========================================================================== */
+.elementor-widget-jobready_widget .elementor-widget-container {
+    padding: 0;
 }
 
-.jobready-results {
-    display: block !important;
-    visibility: visible !important;
-    min-height: 50px;
-    margin-top: 20px;
-    opacity: 1 !important;
-    text-align: left; /* <-- left align content */
-    margin-left: auto;
-    margin-right: auto;
-    max-width: 600px;
+.elementor-widget-jobready_widget .jobready-widget {
+    width: 100%;
 }
 
-.jobready-results h4,
-.jobready-results p,
-.jobready-results ul,
-.jobready-results li {
-    text-align: left;
+/* ==========================================================================
+   Utility Classes
+   ========================================================================== */
+.jr-hidden {
+    display: none !important;
 }
 
-.jobready-keywords {
-    margin: 18px 0 10px 0;
-    padding: 12px 10px;
-    background: #f7f7fa;
-    border-radius: 6px;
-    font-size: 15px;
-    color: #333;
-}
-
-/* Polish: Consistent font, button width, extra spacing */
-.jobready-widget {
-    font-family: 'Inter', Arial, sans-serif;
-}
-
-.jobready-actions .jobready-submit {
-    width: auto;
-    min-width: 180px;
-    margin: 0 auto;
-    display: block;
-    font-size: 16px;
-    font-weight: 600;
-    box-shadow: 0 2px 8px rgba(89,68,249,0.08);
-    transition: background 0.2s, box-shadow 0.2s;
-}
-
-.jobready-results h4 {
-    margin-top: 24px;
-    margin-bottom: 10px;
-    font-size: 17px;
-    color: #5944F9;
-    font-weight: 600;
-}
-
-.jobready-results ul {
-    margin-bottom: 18px;
-}
-
-.jobready-keywords {
-    margin-top: 24px;
-    margin-bottom: 10px;
-    padding: 14px 12px;
-    background: #f7f7fa;
-    border-radius: 8px;
-    font-size: 15px;
-    color: #333;
-}
-
-.jobready-cta-wrap {
-    margin-top: 24px;
+.jr-text-center {
     text-align: center;
 }
 
-.jobready-cta {
-    background: #5944F9;
-    color: #fff;
-    padding: 10px 22px;
-    border-radius: 6px;
-    text-decoration: none;
-    font-weight: 600;
-    box-shadow: 0 2px 8px rgba(89,68,249,0.08);
-    transition: background 0.2s;
+.jr-mt-20 {
+    margin-top: 20px;
 }
 
-.jobready-cta:hover {
-    background: #4935E8;
+.jr-mb-20 {
+    margin-bottom: 20px;
+}
+
+/* ==========================================================================
+   Print Styles
+   ========================================================================== */
+@media print {
+    .jobready-widget {
+        display: none;
+    }
 }
