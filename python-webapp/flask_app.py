@@ -243,42 +243,141 @@ def generate_pdf_report(filename, name, email, ats_score, job_fit_score, kw_scor
     
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 10, "JobReady Resume Analysis Report", ln=True, align="C")
-    pdf.ln(8)
-    pdf.set_font("Helvetica", size=12)
     
+    # Set margins for better layout
+    pdf.set_margins(25, 25, 25)
+    
+    # Header with company branding
+    pdf.set_fill_color(89, 68, 249)  # Primary brand color
+    pdf.rect(0, 0, 210, 40, 'F')
+    
+    # Company name in header
+    pdf.set_font("Helvetica", "B", 24)
+    pdf.set_text_color(255, 255, 255)
+    pdf.cell(0, 40, "JobReady", ln=True, align="C")
+    
+    # Reset text color and position
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_y(50)
+    
+    # Report title
+    pdf.set_font("Helvetica", "B", 20)
+    pdf.cell(0, 15, "Resume Analysis Report", ln=True, align="C")
+    pdf.ln(5)
+    
+    # User information section
+    pdf.set_fill_color(248, 249, 255)  # Light background
+    pdf.rect(25, 70, 160, 25, 'F')
+    
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_y(75)
     if name:
-        pdf.cell(0, 10, f"Name: {name}", ln=True)
-    pdf.cell(0, 10, f"Email: {email}", ln=True)
-    pdf.ln(4)
+        pdf.cell(80, 8, f"Name: {name}", ln=0)
+    pdf.cell(80, 8, f"Email: {email}", ln=True)
+    pdf.ln(5)
     
-    pdf.cell(0, 10, f"ATS Score: {ats_score}", ln=True)
-    pdf.cell(0, 10, f"Job Fit Score: {job_fit_score}", ln=True)
-    pdf.cell(0, 10, f"Keyword Match: {kw_score}%", ln=True)
-    pdf.cell(0, 10, f"Section Completeness: {section_score}%", ln=True)
-    pdf.cell(0, 10, f"Readability: {read_score}%", ln=True)
-    pdf.ln(6)
+    # Scores section with visual design
+    pdf.set_y(105)
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 12, "Analysis Results", ln=True)
+    pdf.ln(3)
     
-    pdf.set_font("Helvetica", "B", 13)
-    pdf.cell(0, 10, "Basic Recommendations:", ln=True)
-    pdf.set_font("Helvetica", size=12)
+    # Score grid layout
+    score_y = 125
+    pdf.set_font("Helvetica", "B", 14)
+    
+    # ATS Score
+    pdf.set_fill_color(89, 68, 249)
+    pdf.rect(25, score_y, 75, 25, 'F')
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_y(score_y + 3)
+    pdf.cell(75, 8, f"{ats_score}%", ln=True, align="C")
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(75, 8, "ATS Score", ln=True, align="C")
+    
+    # Job Fit Score
+    pdf.set_fill_color(46, 125, 50)
+    pdf.rect(110, score_y, 75, 25, 'F')
+    pdf.set_text_color(255, 255, 255)
+    pdf.set_y(score_y + 3)
+    pdf.cell(75, 8, f"{job_fit_score}%", ln=True, align="C")
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(75, 8, "Job Fit Score", ln=True, align="C")
+    
+    # Reset text color
+    pdf.set_text_color(0, 0, 0)
+    pdf.ln(10)
+    
+    # Detailed scores
+    pdf.set_y(score_y + 40)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 10, "Detailed Breakdown:", ln=True)
+    pdf.ln(3)
+    
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(0, 8, f"Keyword Match: {kw_score}%", ln=True)
+    pdf.cell(0, 8, f"Section Completeness: {section_score}%", ln=True)
+    pdf.cell(0, 8, f"Readability: {read_score}%", ln=True)
+    pdf.ln(8)
+    
+    # Recommendations section
+    pdf.set_y(score_y + 80)
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.cell(0, 10, "Recommendations", ln=True)
+    pdf.ln(5)
+    
+    # Basic Recommendations
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_fill_color(248, 249, 255)
+    pdf.rect(25, pdf.get_y(), 160, 8, 'F')
+    pdf.cell(0, 8, "Basic Recommendations:", ln=True)
+    pdf.ln(2)
+    
+    pdf.set_font("Helvetica", "", 10)
     for rec in basic_recs:
-        pdf.multi_cell(0, 8, f"- {rec}")
+        clean_rec = str(rec).strip()
+        if len(clean_rec) > 80:  # Shorter for better fit
+            clean_rec = clean_rec[:77] + "..."
+        try:
+            pdf.multi_cell(0, 6, f"- {clean_rec}")
+        except Exception as e:
+            pdf.cell(0, 6, f"- {clean_rec[:40]}...", ln=True)
+        pdf.ln(2)
+    
+    pdf.ln(3)
+    
+    # AI Recommendations
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_fill_color(248, 249, 255)
+    pdf.rect(25, pdf.get_y(), 160, 8, 'F')
+    pdf.cell(0, 8, "AI-Powered Recommendations:", ln=True)
     pdf.ln(2)
     
-    pdf.set_font("Helvetica", "B", 13)
-    pdf.cell(0, 10, "AI Recommendations:", ln=True)
-    pdf.set_font("Helvetica", size=12)
+    pdf.set_font("Helvetica", "", 10)
     for rec in ai_recs:
-        pdf.multi_cell(0, 8, f"- {rec}")
-    pdf.ln(2)
+        clean_rec = str(rec).strip()
+        if len(clean_rec) > 80:  # Shorter for better fit
+            clean_rec = clean_rec[:77] + "..."
+        try:
+            pdf.multi_cell(0, 6, f"- {clean_rec}")
+        except Exception as e:
+            pdf.cell(0, 6, f"- {clean_rec[:40]}...", ln=True)
+        pdf.ln(2)
     
-    pdf.set_font("Helvetica", "I", 11)
-    pdf.multi_cell(0, 8, "Thank you for using JobReady! For questions, contact support@mazindigital.com.")
-    pdf.output(pdf_path)
+    # Footer
+    pdf.ln(10)
+    pdf.set_font("Helvetica", "I", 10)
+    pdf.set_text_color(128, 128, 128)
+    pdf.cell(0, 8, "Generated by JobReady Resume Analyzer", ln=True, align="C")
+    pdf.cell(0, 8, "For support: support@mazindigital.com", ln=True, align="C")
     
-    return pdf_filename
+    try:
+        pdf.output(pdf_path)
+        return pdf_filename
+    except Exception as e:
+        app_log(f"PDF generation failed: {e}")
+        # Return a simple filename if PDF generation fails
+        return f"{os.path.splitext(filename)[0]}_report_failed.txt"
 
 # -------------------------
 # API route

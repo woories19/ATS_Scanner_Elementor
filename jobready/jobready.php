@@ -2,9 +2,9 @@
 /**
  * Plugin Name: JobReady - An Elementor Widget By Mazin Digital
  * Description: Your personal resume assistant. Upload, scan, and get instant feedback on how job-ready your resume really is.
- * Version: 0.5
+ * Version: 0.6.1
  * Author: <a href="https://mazindigital.com">Mazin Digital</a> | <a href="https://github.com/woories19">GitHub</a>
-*/
+ */
 
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
@@ -18,22 +18,16 @@ define( 'JOBREADY_LOG_FILE', JOBREADY_LOG_DIR . 'error.log' );
 
 // Simple logger (append with timestamp). Attempts to create logs folder.
 function jobready_log( $message ) {
-    // Normalize message
     $time = gmdate( 'Y-m-d H:i:s' );
     $entry = "[$time] $message\n";
-
-    // Try to create logs dir if missing
     if ( ! file_exists( JOBREADY_LOG_DIR ) ) {
         @mkdir( JOBREADY_LOG_DIR, 0755, true );
         if ( ! file_exists( JOBREADY_LOG_DIR ) ) {
-            // Fallback to WP error log
             error_log( "[JobReady] Could not create log dir: " . JOBREADY_LOG_DIR );
             error_log( "[JobReady] $entry" );
             return;
         }
     }
-
-    // Append to file
     @file_put_contents( JOBREADY_LOG_FILE, $entry, FILE_APPEND | LOCK_EX );
 }
 
@@ -43,7 +37,6 @@ jobready_log( 'Boot: JobReady plugin initializing.' );
 $includes = [
     'includes/settings-page.php',
     'includes/enqueue-scripts.php',
-    // widget is loaded later inside jobready_init after Elementor checks
 ];
 
 foreach ( $includes as $inc ) {
@@ -81,30 +74,17 @@ function jobready_init() {
         }
     }
 
-    // Register widget registration hook
-    add_action( 'elementor/widgets/register', 'jobready_register_widget_safe' );
-    jobready_log( 'Registered elementor/widgets/register hook.' );
+    // Register only the main upload/leadgen widget
+    add_action( 'elementor/widgets/register', function( $widgets_manager ) {
+        $widget_upload = JOBREADY_PATH . 'includes/widget-jobready.php';
+        if ( file_exists( $widget_upload ) ) {
+            require_once $widget_upload;
+            if ( class_exists( 'JobReady_Widget' ) ) {
+                try { $widgets_manager->register( new \JobReady_Widget() ); } catch ( Exception $e ) {
+                    jobready_log( 'Exception registering JobReady_Widget: ' . $e->getMessage() );
+                }
+            }
+        }
+    } );
 }
 add_action( 'plugins_loaded', 'jobready_init' );
-
-// Safe widget registration function
-function jobready_register_widget_safe( $widgets_manager ) {
-    $widget_file = JOBREADY_PATH . 'includes/widget-jobready.php';
-    if ( ! file_exists( $widget_file ) ) {
-        jobready_log( 'widget-jobready.php not found when attempting to register widget.' );
-        return;
-    }
-
-    require_once $widget_file;
-
-    if ( class_exists( 'JobReady_Widget' ) ) {
-        try {
-            $widgets_manager->register( new \JobReady_Widget() );
-            jobready_log( 'JobReady_Widget registered successfully.' );
-        } catch ( Exception $e ) {
-            jobready_log( 'Exception registering widget: ' . $e->getMessage() );
-        }
-    } else {
-        jobready_log( 'JobReady_Widget class does not exist after include.' );
-    }
-}

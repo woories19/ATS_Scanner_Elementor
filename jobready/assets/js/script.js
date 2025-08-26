@@ -148,12 +148,11 @@
             this.leadgenData.append('name', name);
             this.leadgenData.append('email', email);
 
-            // Hide modal and show loading
-            $modal.remove();
-            Utils.showLoading($results);
+            // Show pretty loading in modal (instead of abrupt removal)
+            this.showLeadgenLoading($modal);
 
             // Submit to API
-            this.submitToAPI();
+            this.submitToAPI($results, $modal);
         }
 
         handleFileChange(e) {
@@ -192,7 +191,23 @@
             $results.html(modal);
         }
 
-        async submitToAPI() {
+        showLeadgenLoading($modal) {
+            // Add a class for styling transition
+            $modal.addClass('is-loading');
+            // Smoothly replace inner content with loading UI
+            const loadingHtml = `
+                <div class="jobready-loading-overlay" role="status" aria-live="polite">
+                    <div class="jobready-loading-title">Processing your report…</div>
+                    <div class="jobready-progress">
+                        <div class="jobready-progress-bar"></div>
+                    </div>
+                    <div class="jobready-loading-sub">This usually takes ~5–10 seconds.</div>
+                </div>
+            `;
+            $modal.html(loadingHtml);
+        }
+
+        async submitToAPI($results, $modal) {
             try {
                 const response = await $.ajax({
                     url: this.apiUrl.replace(/\/$/, '') + '/analyze',
@@ -213,27 +228,17 @@
 
             } catch (error) {
                 Utils.debug('API Error:', error);
-                this.handleAPIError(error);
+                // If modal exists, show error there; otherwise, in results
+                const $target = ($modal && $modal.length) ? $modal : $results;
+                let errorMessage = 'An error occurred while processing your request.';
+                if (error.status === 0) errorMessage = 'Network error. Please try again.';
+                else if (error.status === 413) errorMessage = 'File is too large. Please upload a smaller file.';
+                else if (error.status === 415) errorMessage = 'Invalid file type. Please upload PDF or DOCX only.';
+                else if (error.status === 400 && error.responseJSON && error.responseJSON.error) errorMessage = error.responseJSON.error;
+                else if (error.statusText === 'timeout') errorMessage = 'Request timed out. Please try again.';
+                $target.removeClass('is-loading');
+                $target.html(`<div class="jobready-error">${Utils.escapeHtml(errorMessage)}</div>`);
             }
-        }
-
-        handleAPIError(error) {
-            const $results = this.$widget.find('.jobready-results');
-            let errorMessage = 'An error occurred while processing your request.';
-
-            if (error.status === 0) {
-                errorMessage = 'Network error. Please check your connection and try again.';
-            } else if (error.status === 413) {
-                errorMessage = 'File is too large. Please upload a smaller file.';
-            } else if (error.status === 415) {
-                errorMessage = 'Invalid file type. Please upload PDF or DOCX only.';
-            } else if (error.status === 400 && error.responseJSON && error.responseJSON.error) {
-                errorMessage = error.responseJSON.error;
-            } else if (error.statusText === 'timeout') {
-                errorMessage = 'Request timed out. Please try again.';
-            }
-
-            $results.html(`<div class="jobready-error">${Utils.escapeHtml(errorMessage)}</div>`);
         }
     }
 

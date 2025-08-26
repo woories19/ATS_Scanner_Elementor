@@ -160,6 +160,60 @@
     padding: 32px 24px;
     text-align: center;
     backdrop-filter: blur(10px);
+    transition: transform .2s ease, opacity .2s ease;
+}
+
+.jobready-leadgen-modal.is-loading {
+    padding: 28px 24px;
+}
+
+.jobready-loading-overlay {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+}
+
+.jobready-loading-title {
+    font-weight: 700;
+    color: var(--jr-text);
+}
+
+.jobready-loading-sub {
+    font-size: 12px;
+    color: var(--jr-text-light);
+}
+
+.jobready-progress {
+    width: 100%;
+    max-width: 280px;
+    height: 8px;
+    background: #eee;
+    border-radius: 999px;
+    overflow: hidden;
+    position: relative;
+}
+
+.jobready-progress-bar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, var(--jr-primary), #7a68ff);
+    animation: jr-progress 2s ease-in-out infinite;
+}
+
+@keyframes jr-progress {
+    0% { width: 0; }
+    50% { width: 80%; }
+    100% { width: 100%; }
+}
+
+/* Center generic containers that may be theme constrained */
+.jobready-results, .jobready-widget .container, .jobready-thankyou-page .container, .jobready-thankyou-content {
+    margin-left: auto;
+    margin-right: auto;
 }
 
 .jobready-leadgen-title {
