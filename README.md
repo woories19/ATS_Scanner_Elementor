@@ -40,15 +40,27 @@ ATS Resume Scanner is a custom-built Elementor widget that allows users to uploa
 
 ```text
 ats-scanner-elementor/
+├── jobready/
+│ ├── assets/
+│ │ ├── css
+│ │ │ └── styles.css
+│ │ ├── js
+│ │ │ └── script.js
+│ │ └── logs
+│ ├── includes/
+│ │ ├── enqueue-scripts.php
+│ │ ├── settings-page.php
+│ │ └── widget-jobready.php
+│ ├── jobready.php
+│ └── thank-you-template.php
 │
-├── assets/
-│ ├── style.css
-│ └── ats-scanner.js
-├── includes/
-│ └── widgets/
-│   └── ats-scanner-widget.php
-├── ats-scanner-elementor.php
-└── README.md
+├── python-webapp/
+│ ├── logs/
+│ ├── uploads/
+│ └── flask_app.py/
+│
+├──  README.md
+└── requirements.txt
 ```
 
 ---
@@ -58,10 +70,13 @@ ats-scanner-elementor/
 - [x] Basic functionality (upload + analyze)
 - [x] Keyword comparison feature
 - [x] Circular progress visualization
-- [ ] Enhanced ATS logic (AI scoring, job title match)
-- [ ] Resume format suggestions
+- [x] Enhanced ATS logic (AI scoring, job title match)
+- [x] Resume format suggestions
 - [ ] Multilingual support
+- [ ] Generate PDF Report of Results
 - [ ] Save/download analysis as PDF
+- [ ] Store Lead Gen Data
+- [ ] PDF Report Email Dispatch Logic
 
 ---
 
@@ -80,6 +95,6 @@ This project is licensed under the [MIT License](LICENSE).
 ## 🌐 Live Demo
 
 You can try out the working demo here:  
-**[https://mazindigital.com/ats-scanner/](https://mazindigital.com/ats-scanner/)**
+**[https://resume.mazindigital.com/](https://resume.mazindigital.com/)**
 
 ---
