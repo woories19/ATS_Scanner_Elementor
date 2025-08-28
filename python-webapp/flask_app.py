@@ -15,6 +15,7 @@ import os
 import re
 import json
 import traceback
+import time
 from fpdf import FPDF
 from datetime import datetime
 
@@ -42,6 +43,12 @@ ALLOWED_ORIGINS = [
     "https://resume.mazindigital.com",
     # add more origins if needed for testing
 ]
+
+ALLOWED_EXTS = {".pdf", ".docx"}
+
+def is_allowed_file(filename: str) -> bool:
+    _, ext = os.path.splitext((filename or "").lower())
+    return ext in ALLOWED_EXTS
 
 # OpenAI key (recommended: set via env var in production)
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
@@ -151,6 +158,10 @@ def readability_score(resume_text):
         return 95.0
     return 80.0
 
+def _contains_bullets(text: str) -> bool:
+    t = text or ""
+    return ("-" in t) or ("•" in t)
+
 def generate_rule_based_recommendations(resume_text, job_description):
     recs = []
     t = (resume_text or "").lower()
@@ -161,7 +172,7 @@ def generate_rule_based_recommendations(resume_text, job_description):
     if "skills" not in t:
         recs.append("Add a 'Skills' section listing relevant technical and soft skills.")
     # bullet check
-    if "•" not in resume_text and "-" not in resume_text and "•" not in resume_text:
+    if not _contains_bullets(resume_text):
         recs.append("Use bullet points for responsibilities and achievements for better readability.")
     # keyword match low
     kw_score = keyword_match_score(resume_text, job_description)
@@ -236,148 +247,267 @@ Job Description:
 # -------------------------
 # PDF Report Generation
 # -------------------------
+BRAND_COLORS = {
+    "brand": (0x4c, 0x3b, 0xd0),      # #4c3bd0
+    "secondary": (0x1f, 0x17, 0x53),  # #1f1753
+    "tertiary": (0x9f, 0xc2, 0xcc),   # #9fc2cc
+    "text": (0x00, 0x00, 0x00),       # #000000
+}
+
+
+def _safe_truncate(text: str, max_len: int) -> str:
+    s = (text or "").strip()
+    return s if len(s) <= max_len else s[: max_len - 3] + "..."
+
+
+def sanitize_for_pdf(text: str) -> str:
+    """Replace unsupported unicode with ASCII equivalents and strip the rest."""
+    t = str(text or "")
+    replacements = {
+        "•": "- ",
+        "–": "-",
+        "—": "-",
+        "…": "...",
+        "“": '"',
+        "”": '"',
+        "‘": "'",
+        "’": "'",
+        "·": "-",
+        "×": "x",
+        "✓": "",
+        "✔": "",
+        "▶": ">",
+        "►": ">",
+    }
+    for k, v in replacements.items():
+        t = t.replace(k, v)
+    try:
+        t = t.encode("latin-1", errors="ignore").decode("latin-1")
+    except Exception:
+        # As a very last resort, drop to ascii
+        t = t.encode("ascii", errors="ignore").decode("ascii")
+    return t
+
+
 def generate_pdf_report(filename, name, email, ats_score, job_fit_score, kw_score, section_score, read_score, basic_recs, ai_recs):
-    """Generate PDF report with all analysis results"""
+    """Generate a concise, single-page on-brand PDF report."""
     pdf_filename = f"{os.path.splitext(filename)[0]}_report.pdf"
     pdf_path = os.path.join(app.config["UPLOAD_FOLDER"], pdf_filename)
-    
-    pdf = FPDF()
+
+    pdf = FPDF(format="A4")
     pdf.add_page()
-    
-    # Set margins for better layout
-    pdf.set_margins(25, 25, 25)
-    
-    # Header with company branding
-    pdf.set_fill_color(89, 68, 249)  # Primary brand color
-    pdf.rect(0, 0, 210, 40, 'F')
-    
-    # Company name in header
-    pdf.set_font("Helvetica", "B", 24)
-    pdf.set_text_color(255, 255, 255)
-    pdf.cell(0, 40, "JobReady", ln=True, align="C")
-    
-    # Reset text color and position
-    pdf.set_text_color(0, 0, 0)
-    pdf.set_y(50)
-    
-    # Report title
-    pdf.set_font("Helvetica", "B", 20)
-    pdf.cell(0, 15, "Resume Analysis Report", ln=True, align="C")
-    pdf.ln(5)
-    
-    # User information section
-    pdf.set_fill_color(248, 249, 255)  # Light background
-    pdf.rect(25, 70, 160, 25, 'F')
-    
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.set_y(75)
-    if name:
-        pdf.cell(80, 8, f"Name: {name}", ln=0)
-    pdf.cell(80, 8, f"Email: {email}", ln=True)
-    pdf.ln(5)
-    
-    # Scores section with visual design
-    pdf.set_y(105)
+
+    # Layout constants
+    left_margin = 18
+    right_margin = 18
+    pdf.set_left_margin(left_margin)
+    pdf.set_right_margin(right_margin)
+    top_y = 15
+
+    # Header: Logo + Title
+    y = top_y
+    logo_path = os.environ.get("LOGO_PATH", "")  # absolute path to PNG on server
+
+    # Draw a slim brand bar
+    pdf.set_fill_color(*BRAND_COLORS["brand"])
+    pdf.rect(0, 0, 210, 10, "F")
+
+    # Logo (optional)
+    has_logo = False
+    if logo_path and os.path.exists(logo_path):
+        try:
+            pdf.image(logo_path, x=left_margin, y=y, w=28)  # small logo
+            has_logo = True
+        except Exception as e:
+            app_log(f"PDF logo load failed: {e}")
+
+    # Title block
+    pdf.set_xy(left_margin + (32 if has_logo else 0), y)
+    pdf.set_text_color(*BRAND_COLORS["secondary"])  # secondary for title
     pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 12, "Analysis Results", ln=True)
-    pdf.ln(3)
-    
-    # Score grid layout
-    score_y = 125
-    pdf.set_font("Helvetica", "B", 14)
-    
-    # ATS Score
-    pdf.set_fill_color(89, 68, 249)
-    pdf.rect(25, score_y, 75, 25, 'F')
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_y(score_y + 3)
-    pdf.cell(75, 8, f"{ats_score}%", ln=True, align="C")
+    pdf.cell(0, 8, sanitize_for_pdf("JobReady Resume Analysis"), ln=True)
+
+    # Meta line
+    pdf.set_text_color(*BRAND_COLORS["text"])
     pdf.set_font("Helvetica", "", 10)
-    pdf.cell(75, 8, "ATS Score", ln=True, align="C")
-    
-    # Job Fit Score
-    pdf.set_fill_color(46, 125, 50)
-    pdf.rect(110, score_y, 75, 25, 'F')
-    pdf.set_text_color(255, 255, 255)
-    pdf.set_y(score_y + 3)
-    pdf.cell(75, 8, f"{job_fit_score}%", ln=True, align="C")
+    meta_parts = []
+    if name:
+        meta_parts.append(f"Name: {name}")
+    if email:
+        meta_parts.append(f"Email: {email}")
+    meta_parts.append(datetime.utcnow().strftime("%Y-%m-%d"))
+    meta_line = sanitize_for_pdf("  |  ".join(meta_parts))
+    pdf.set_x(left_margin + (32 if has_logo else 0))
+    pdf.cell(0, 6, meta_line, ln=True)
+
+    # Divider
+    pdf.set_draw_color(*BRAND_COLORS["tertiary"])  # soft divider
+    pdf.set_line_width(0.3)
+    pdf.line(left_margin, pdf.get_y() + 2, 210 - right_margin, pdf.get_y() + 2)
+    pdf.ln(6)
+
+    # Scores section (compact badges)
+    badge_h = 12
+    gap = 6
+    col_w = (210 - left_margin - right_margin - gap) / 2
+    start_x = left_margin
+    start_y = pdf.get_y()
+
+    def draw_badge(x, y, title, value, fill_rgb):
+        pdf.set_xy(x, y)
+        # Background box (light tint from brand)
+        pdf.set_fill_color(245, 245, 255)
+        pdf.set_draw_color(*fill_rgb)
+        pdf.set_line_width(0.3)
+        pdf.rect(x, y, col_w, badge_h * 2 + 2, "FD")
+        # Left accent strip
+        pdf.set_fill_color(*fill_rgb)
+        pdf.rect(x, y, 3, badge_h * 2 + 2, "F")
+        # Title
+        pdf.set_text_color(60, 60, 60)
+        pdf.set_font("Helvetica", "", 10)
+        pdf.set_xy(x + 6, y + 3)
+        pdf.cell(col_w - 8, badge_h - 2, sanitize_for_pdf(title), ln=1)
+        # Value
+        pdf.set_text_color(*fill_rgb)
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.set_x(x + 6)
+        pdf.cell(col_w - 8, badge_h, sanitize_for_pdf(f"{value}%"), ln=0)
+
+    draw_badge(start_x, start_y, "ATS Score", ats_score, BRAND_COLORS["brand"])
+    draw_badge(start_x + col_w + gap, start_y, "Job Fit Score", job_fit_score, BRAND_COLORS["secondary"])
+
+    pdf.set_y(start_y + badge_h * 2 + 6)
+    pdf.set_x(left_margin)
+
+    # Detail metrics as chips
     pdf.set_font("Helvetica", "", 10)
-    pdf.cell(75, 8, "Job Fit Score", ln=True, align="C")
-    
-    # Reset text color
-    pdf.set_text_color(0, 0, 0)
-    pdf.ln(10)
-    
-    # Detailed scores
-    pdf.set_y(score_y + 40)
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 10, "Detailed Breakdown:", ln=True)
-    pdf.ln(3)
-    
-    pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 8, f"Keyword Match: {kw_score}%", ln=True)
-    pdf.cell(0, 8, f"Section Completeness: {section_score}%", ln=True)
-    pdf.cell(0, 8, f"Readability: {read_score}%", ln=True)
-    pdf.ln(8)
-    
-    # Recommendations section
-    pdf.set_y(score_y + 80)
-    pdf.set_font("Helvetica", "B", 14)
-    pdf.cell(0, 10, "Recommendations", ln=True)
-    pdf.ln(5)
-    
-    # Basic Recommendations
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.set_fill_color(248, 249, 255)
-    pdf.rect(25, pdf.get_y(), 160, 8, 'F')
-    pdf.cell(0, 8, "Basic Recommendations:", ln=True)
+    pdf.set_text_color(50, 50, 50)
+
+    def chip(text, x, y):
+        txt = sanitize_for_pdf(text)
+        tw = pdf.get_string_width(txt) + 10
+        pdf.set_fill_color(244, 244, 244)  # Background from provided palette
+        pdf.set_draw_color(200, 205, 220)
+        pdf.set_line_width(0.2)
+        pdf.rect(x, y, tw, 7, "FD")
+        pdf.set_xy(x + 3, y + 1.5)
+        pdf.cell(tw - 6, 4, txt)
+        return x + tw + 4
+
+    line_y = pdf.get_y()
+    x = left_margin
+    x = chip(f"Keyword Match: {kw_score}%", x, line_y)
+    x = chip(f"Sections: {section_score}%", x, line_y)
+    x = chip(f"Readability: {read_score}%", x, line_y)
+
+    pdf.set_y(line_y + 10)
+    pdf.set_x(left_margin)
+
+    # Recommendations (single page, no truncation)
     pdf.ln(2)
-    
-    pdf.set_font("Helvetica", "", 10)
-    for rec in basic_recs:
-        clean_rec = str(rec).strip()
-        if len(clean_rec) > 80:  # Shorter for better fit
-            clean_rec = clean_rec[:77] + "..."
-        try:
-            pdf.multi_cell(0, 6, f"- {clean_rec}")
-        except Exception as e:
-            pdf.cell(0, 6, f"- {clean_rec[:40]}...", ln=True)
-        pdf.ln(2)
-    
-    pdf.ln(3)
-    
-    # AI Recommendations
     pdf.set_font("Helvetica", "B", 12)
-    pdf.set_fill_color(248, 249, 255)
-    pdf.rect(25, pdf.get_y(), 160, 8, 'F')
-    pdf.cell(0, 8, "AI-Powered Recommendations:", ln=True)
-    pdf.ln(2)
-    
+    pdf.set_text_color(*BRAND_COLORS["secondary"])  # section heading color
+    pdf.cell(0, 7, sanitize_for_pdf("Top Recommendations"), ln=True)
+
     pdf.set_font("Helvetica", "", 10)
-    for rec in ai_recs:
-        clean_rec = str(rec).strip()
-        if len(clean_rec) > 80:  # Shorter for better fit
-            clean_rec = clean_rec[:77] + "..."
-        try:
-            pdf.multi_cell(0, 6, f"- {clean_rec}")
-        except Exception as e:
-            pdf.cell(0, 6, f"- {clean_rec[:40]}...", ln=True)
-        pdf.ln(2)
-    
-    # Footer
-    pdf.ln(10)
-    pdf.set_font("Helvetica", "I", 10)
-    pdf.set_text_color(128, 128, 128)
-    pdf.cell(0, 8, "Generated by JobReady Resume Analyzer", ln=True, align="C")
-    pdf.cell(0, 8, "For support: support@mazindigital.com", ln=True, align="C")
-    
+    pdf.set_text_color(*BRAND_COLORS["text"])
+
+    # Higher caps; prevent overflow by checking bottom limit
+    max_basic = 5
+    max_ai = 5
+    bottom_limit = 297 - 18  # A4 height - bottom margin (mm)
+
+    def add_list(label, items, max_count):
+        if not items:
+            return
+        # If close to bottom, skip header
+        if pdf.get_y() + 8 > bottom_limit:
+            return
+        pdf.set_font("Helvetica", "B", 10)
+        pdf.set_text_color(*BRAND_COLORS["brand"])  # label color
+        pdf.cell(0, 6, sanitize_for_pdf(label), ln=True)
+        pdf.set_text_color(*BRAND_COLORS["text"])
+        pdf.set_font("Helvetica", "", 10)
+        shown = 0
+        for rec in items:
+            if shown >= max_count:
+                break
+            if pdf.get_y() + 7 > bottom_limit:
+                break
+            clean = str(rec).strip()
+            txt = sanitize_for_pdf(f"- {clean}")
+            # Ensure left margin and full width
+            pdf.set_x(left_margin)
+            try:
+                pdf.multi_cell(0, 5, txt)
+            except Exception:
+                pdf.cell(0, 5, sanitize_for_pdf(f"- {clean}"), ln=True)
+            shown += 1
+        pdf.ln(1)
+
+    add_list("Basic", basic_recs or [], max_basic)
+    add_list("AI", ai_recs or [], max_ai)
+
+    # Footer (fixed position at bottom of A4)
+    footer_margin_bottom = 18  # bottom margin in mm
+    footer_block_h = 12        # total footer block height
+    footer_y = 297 - footer_margin_bottom - footer_block_h
+    if pdf.get_y() > footer_y - 5:
+        # If content is too close to footer area, nudge footer slightly lower safeguard
+        footer_y = min(297 - footer_margin_bottom - 6, pdf.get_y() + 2)
+    pdf.set_y(footer_y)
+    pdf.set_draw_color(220, 220, 220)
+    pdf.line(left_margin, footer_y, 210 - right_margin, footer_y)
+    pdf.ln(3)
+    pdf.set_font("Helvetica", "I", 9)
+    pdf.set_text_color(110, 110, 110)
+    footer = sanitize_for_pdf("Generated by JobReady | Mazin Digital | support@mazindigital.com")
+    pdf.cell(0, 5, footer, ln=True, align="C")
+
     try:
         pdf.output(pdf_path)
         return pdf_filename
     except Exception as e:
         app_log(f"PDF generation failed: {e}")
-        # Return a simple filename if PDF generation fails
         return f"{os.path.splitext(filename)[0]}_report_failed.txt"
+
+# Utility: filename helpers
+SAFE_NAME_RE = re.compile(r"[^a-zA-Z0-9_\-]+")
+
+def _safe_base_from_name(name: str) -> str:
+    base = (name or "").strip()
+    if not base:
+        return "candidate"
+    # collapse whitespace to single spaces, then replace spaces with underscores
+    base = re.sub(r"\s+", " ", base)
+    base = base.strip()
+    base = base.replace(" ", "_")
+    # remove unsafe chars
+    base = SAFE_NAME_RE.sub("", base)
+    base = base.strip("._-") or "candidate"
+    return base[:60]
+
+def _extract_candidate_name(resume_text: str) -> str:
+    # Simple heuristic: first non-empty line with 2-4 words in Title Case
+    lines = [l.strip() for l in (resume_text or "").splitlines() if l.strip()]
+    for line in lines[:10]:
+        parts = [p for p in re.split(r"\s+", line) if p]
+        if 1 <= len(parts) <= 5:
+            # basic check: mostly alphabetic and title-like
+            alpha_ratio = sum(ch.isalpha() for ch in line) / max(1, len(line))
+            if alpha_ratio > 0.6:
+                return line
+    return ""
+
+def _unique_filename(directory: str, filename: str) -> str:
+    base, ext = os.path.splitext(filename)
+    candidate = filename
+    idx = 1
+    while os.path.exists(os.path.join(directory, candidate)):
+        candidate = f"{base}-{idx}{ext}"
+        idx += 1
+    return candidate
 
 # -------------------------
 # API route
@@ -397,20 +527,25 @@ def analyze():
         # Get inputs
         resume_file = request.files["resume"]
         job_description = request.form.get("job_description", "").strip()
-        name = request.form.get("name", "").strip()
-        email = request.form.get("email", "").strip()
+        name = request.form.get("name", "").strip()[:120]
+        email = request.form.get("email", "").strip()[:120]
 
         # Validate inputs
         if resume_file.filename == "":
             app_log("Empty filename submitted.")
             return jsonify({"error": "Empty resume file."}), 400
         
+        if not is_allowed_file(resume_file.filename):
+            return jsonify({"error": "Invalid file type. Please upload PDF or DOCX only."}), 415
+        
         if not job_description:
             return jsonify({"error": "Job description cannot be empty."}), 400
 
-        # Save uploaded file
-        filename = secure_filename(resume_file.filename)
-        save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+        # Save uploaded file with a unique name to avoid collisions
+        original_name = secure_filename(resume_file.filename)
+        base, ext = os.path.splitext(original_name)
+        unique_name = f"{base}_{int(time.time())}{ext}"
+        save_path = os.path.join(app.config["UPLOAD_FOLDER"], unique_name)
         try:
             resume_file.stream.seek(0)
             with open(save_path, "wb") as f:
@@ -426,8 +561,26 @@ def analyze():
         resume_file.stream.seek(0)
         resume_text = extract_text_from_file(resume_file)
         if not resume_text or len(resume_text.strip()) == 0:
-            app_log("Text extraction failed or returned empty for file: " + filename)
+            app_log("Text extraction failed or returned empty for file: " + unique_name)
             return jsonify({"error": "Unable to extract text from resume. Ensure the PDF is not a scanned image."}), 400
+
+        # Determine candidate name for filenames
+        display_name = name or _extract_candidate_name(resume_text) or "candidate"
+        safe_base = _safe_base_from_name(display_name)
+
+        # Build final upload filename based on candidate name
+        original_ext = os.path.splitext(secure_filename(resume_file.filename))[1].lower() or ".pdf"
+        upload_final_name = _unique_filename(app.config["UPLOAD_FOLDER"], f"{safe_base}{original_ext}")
+        # If different, rename saved file
+        final_path = os.path.join(app.config["UPLOAD_FOLDER"], upload_final_name)
+        try:
+            if os.path.abspath(final_path) != os.path.abspath(save_path):
+                os.replace(save_path, final_path)
+                app_log(f"Renamed upload to {final_path}")
+        except Exception as e:
+            app_log(f"Failed to rename upload: {e}")
+            final_path = save_path
+            upload_final_name = unique_name
 
         # Calculate scores
         kw_score = keyword_match_score(resume_text, job_description)
@@ -448,9 +601,9 @@ def analyze():
             # fallback if AI failed
             ai_recs = basic_recs[:3] if basic_recs else ["Improve readability and add role-specific keywords."]
 
-        # Generate PDF report
+        # Generate PDF report (use safe_base for report name)
         pdf_filename = generate_pdf_report(
-            filename, name, email, ats_score, job_fit_score, 
+            f"{safe_base}{original_ext}", name, email, ats_score, job_fit_score,
             kw_score, section_score, read_score, basic_recs, ai_recs
         )
 
@@ -462,7 +615,7 @@ def analyze():
             "status": "pdf_generated"
         }
         
-        app_log(f"Analyze success for {filename}: ATS {ats_score}, Fit {job_fit_score}, PDF: {pdf_filename}")
+        app_log(f"Analyze success for {upload_final_name}: ATS {ats_score}, Fit {job_fit_score}, PDF: {pdf_filename}")
         return jsonify(response), 200
         
     except Exception as e:
