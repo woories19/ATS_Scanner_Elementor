@@ -4,28 +4,35 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 function jobready_enqueue_assets() {
-    // Force jQuery first
     wp_enqueue_script('jquery');
     
-    // Then styles
     wp_enqueue_style(
         'jobready-styles',
         JOBREADY_URL . 'assets/css/styles.css',
         array(),
-        '1.1.3',
-        'all'  // Add media type
+        '1.1.5',
+        'all'
     );
 
-    // Then our script
     wp_enqueue_script(
         'jobready-script',
         JOBREADY_URL . 'assets/js/script.js',
         array('jquery'),
-        '1.1.3',
+        '1.1.5',
         true
+    );
+
+    $token = get_option( 'jobready_webhook_token', '' );
+
+    wp_localize_script(
+        'jobready-script',
+        'jobreadyRest',
+        array(
+            'restUrl' => esc_url_raw( rest_url( 'jobready/v1/send-report' ) ),
+            'nonce'   => wp_create_nonce( 'wp_rest' ),
+            'token'   => $token,
+        )
     );
 }
 add_action( 'wp_enqueue_scripts', 'jobready_enqueue_assets' );
-
-// Ensure scripts also available in Elementor editor
 add_action( 'elementor/editor/after_enqueue_scripts', 'jobready_enqueue_assets' );

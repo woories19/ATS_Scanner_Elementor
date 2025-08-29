@@ -222,6 +222,30 @@
                     throw new Error('Invalid server response');
                 }
 
+                // Attempt to trigger email via WordPress REST (best-effort)
+                try {
+                    if (window.jobreadyRest && jobreadyRest.restUrl) {
+                        const headers = { 'X-WP-Nonce': jobreadyRest.nonce };
+                        if (jobreadyRest.token) headers['X-JobReady-Token'] = jobreadyRest.token;
+                        await $.ajax({
+                            url: jobreadyRest.restUrl,
+                            type: 'POST',
+                            headers: headers,
+                            contentType: 'application/json; charset=UTF-8',
+                            data: JSON.stringify({
+                                name: this.leadgenData.get('name') || '',
+                                email: this.leadgenData.get('email') || '',
+                                ats_score: response.ats_score,
+                                job_fit_score: response.job_fit_score,
+                                pdf_url: response.pdf_url
+                            }),
+                            timeout: 8000
+                        });
+                    }
+                } catch (e) {
+                    Utils.debug('WP email dispatch failed (client-side):', e);
+                }
+
                 // Redirect to thank you page with scores
                 const thankYouUrl = `/resume-submission/?ats=${encodeURIComponent(response.ats_score)}&fit=${encodeURIComponent(response.job_fit_score)}`;
                 window.location.href = thankYouUrl;

@@ -16,6 +16,7 @@ import re
 import json
 import traceback
 import time
+import sqlite3
 from fpdf import FPDF
 from datetime import datetime
 
@@ -35,6 +36,10 @@ from openai import OpenAI
 UPLOAD_FOLDER = "uploads"
 LOG_FOLDER = "logs"
 LOG_FILE = os.path.join(LOG_FOLDER, "jobready.log")
+DATA_DB = os.path.join(LOG_FOLDER, "leads.sqlite3")
+
+# Email settings removed in favor of WordPress webhook
+# EMAIL_ENABLED, SMTP_* and send_report_email() removed
 
 # Allowed origins for CORS — put your production domain(s) here.
 ALLOWED_ORIGINS = [
@@ -57,6 +62,33 @@ OPENAI_MODEL = "gpt-4o-mini"  # change to preferred model (gpt-5-nano after bill
 # Create minimal folders
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(LOG_FOLDER, exist_ok=True)
+
+# Initialize SQLite (lead gen)
+def init_db():
+    try:
+        with sqlite3.connect(DATA_DB) as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS leads (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    created_at TEXT NOT NULL,
+                    name TEXT,
+                    email TEXT,
+                    original_filename TEXT,
+                    saved_filename TEXT,
+                    ats_score INTEGER,
+                    job_fit_score INTEGER,
+                    keyword_match REAL,
+                    section_score REAL,
+                    readability REAL,
+                    pdf_filename TEXT
+                )
+                """
+            )
+    except Exception as e:
+        app_log("DB init failed: " + str(e))
+
+init_db()
 
 # Initialize Flask and CORS
 app = Flask(__name__)
@@ -510,6 +542,12 @@ def _unique_filename(directory: str, filename: str) -> str:
     return candidate
 
 # -------------------------
+# Email helper (best-effort)
+# -------------------------
+# Email settings removed in favor of WordPress webhook
+# EMAIL_ENABLED, SMTP_* and send_report_email() removed
+
+# -------------------------
 # API route
 # -------------------------
 @app.route("/analyze", methods=["POST"])
@@ -607,11 +645,39 @@ def analyze():
             kw_score, section_score, read_score, basic_recs, ai_recs
         )
 
-        # Build response
+        # Persist lead to SQLite (best-effort)
+        try:
+            with sqlite3.connect(DATA_DB) as conn:
+                conn.execute(
+                    """
+                    INSERT INTO leads (
+                        created_at, name, email, original_filename, saved_filename,
+                        ats_score, job_fit_score, keyword_match, section_score, readability, pdf_filename
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+                        name,
+                        email,
+                        secure_filename(resume_file.filename),
+                        upload_final_name,
+                        int(ats_score),
+                        int(job_fit_score),
+                        float(kw_score),
+                        float(section_score),
+                        float(read_score),
+                        pdf_filename,
+                    ),
+                )
+        except Exception as e:
+            app_log("DB insert failed: " + str(e))
+
+        # Build response with absolute PDF URL (from this server)
+        public_pdf_url = request.url_root.rstrip('/') + f"/uploads/{pdf_filename}"
         response = {
             "ats_score": ats_score,
             "job_fit_score": job_fit_score,
-            "pdf_url": f"/uploads/{pdf_filename}",
+            "pdf_url": public_pdf_url,
             "status": "pdf_generated"
         }
         

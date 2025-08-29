@@ -2,7 +2,7 @@
 /**
  * Plugin Name: JobReady - An Elementor Widget By Mazin Digital
  * Description: Your personal resume assistant. Upload, scan, and get instant feedback on how job-ready your resume really is.
- * Version: 0.6.1
+ * Version: 0.7.6
  * Author: <a href="https://mazindigital.com">Mazin Digital</a> | <a href="https://github.com/woories19">GitHub</a>
  */
 
@@ -16,7 +16,6 @@ define( 'JOBREADY_URL', plugin_dir_url( __FILE__ ) );
 define( 'JOBREADY_LOG_DIR', JOBREADY_PATH . 'assets/logs/' );
 define( 'JOBREADY_LOG_FILE', JOBREADY_LOG_DIR . 'error.log' );
 
-// Simple logger (append with timestamp). Attempts to create logs folder.
 function jobready_log( $message ) {
     $time = gmdate( 'Y-m-d H:i:s' );
     $entry = "[$time] $message\n";
@@ -31,12 +30,12 @@ function jobready_log( $message ) {
     @file_put_contents( JOBREADY_LOG_FILE, $entry, FILE_APPEND | LOCK_EX );
 }
 
-// Boot sequence: load includes if present
 jobready_log( 'Boot: JobReady plugin initializing.' );
 
 $includes = [
     'includes/settings-page.php',
     'includes/enqueue-scripts.php',
+    'includes/rest-endpoint.php',
 ];
 
 foreach ( $includes as $inc ) {
@@ -49,11 +48,9 @@ foreach ( $includes as $inc ) {
     }
 }
 
-// Initialize plugin only after plugins_loaded
 function jobready_init() {
     jobready_log( 'jobready_init called.' );
 
-    // Check Elementor
     if ( ! did_action( 'elementor/loaded' ) ) {
         add_action( 'admin_notices', function() {
             echo '<div class="notice notice-warning"><p><strong>JobReady:</strong> Elementor is not active. The JobReady widget requires Elementor.</p></div>';
@@ -62,7 +59,6 @@ function jobready_init() {
         return;
     }
 
-    // Version check for Elementor if constant exists
     if ( defined( 'ELEMENTOR_VERSION' ) ) {
         $required = '3.0.0';
         if ( version_compare( ELEMENTOR_VERSION, $required, '<' ) ) {
@@ -74,7 +70,6 @@ function jobready_init() {
         }
     }
 
-    // Register only the main upload/leadgen widget
     add_action( 'elementor/widgets/register', function( $widgets_manager ) {
         $widget_upload = JOBREADY_PATH . 'includes/widget-jobready.php';
         if ( file_exists( $widget_upload ) ) {
