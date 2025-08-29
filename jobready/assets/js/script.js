@@ -222,11 +222,19 @@
                     throw new Error('Invalid server response');
                 }
 
-                // Attempt to trigger email via WordPress REST (best-effort)
+                // Store lead data in WordPress (best-effort)
                 try {
                     if (window.jobreadyRest && jobreadyRest.restUrl) {
                         const headers = { 'X-WP-Nonce': jobreadyRest.nonce };
                         if (jobreadyRest.token) headers['X-JobReady-Token'] = jobreadyRest.token;
+                        
+                        // Get resume filename from the file input
+                        const resumeFile = this.leadgenData.get('resume');
+                        const resumeFilename = resumeFile ? resumeFile.name : 'Unknown';
+                        
+                        // Get job description from the form
+                        const jobDescription = this.leadgenData.get('job_description') || '';
+                        
                         await $.ajax({
                             url: jobreadyRest.restUrl,
                             type: 'POST',
@@ -237,13 +245,18 @@
                                 email: this.leadgenData.get('email') || '',
                                 ats_score: response.ats_score,
                                 job_fit_score: response.job_fit_score,
-                                pdf_url: response.pdf_url
+                                pdf_url: response.pdf_url,
+                                resume_filename: resumeFilename,
+                                job_description: jobDescription,
+                                consent_given: true
                             }),
                             timeout: 8000
                         });
+                        
+                        Utils.debug('Lead stored successfully in WordPress');
                     }
                 } catch (e) {
-                    Utils.debug('WP email dispatch failed (client-side):', e);
+                    Utils.debug('WP lead storage failed (client-side):', e);
                 }
 
                 // Redirect to thank you page with scores

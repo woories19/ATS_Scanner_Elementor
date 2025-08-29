@@ -32,10 +32,16 @@ function jobready_log( $message ) {
 
 jobready_log( 'Boot: JobReady plugin initializing.' );
 
+// Create database table on plugin activation
+register_activation_hook( __FILE__, 'jobready_create_leads_table' );
+
 $includes = [
     'includes/settings-page.php',
     'includes/enqueue-scripts.php',
     'includes/rest-endpoint.php',
+    'includes/database.php',
+    'includes/leads-endpoint.php',
+    'includes/leads-admin.php',
 ];
 
 foreach ( $includes as $inc ) {
