@@ -259,6 +259,28 @@
                     Utils.debug('WP lead storage failed (client-side):', e);
                 }
 
+                        // Now dispatch email via WordPress REST endpoint
+                        try {
+                            await $.ajax({
+                                url: jobreadyRest.emailUrl,
+                                type: 'POST',
+                                headers: headers,
+                                contentType: 'application/json; charset=UTF-8',
+                                data: JSON.stringify({
+                                    name: this.leadgenData.get('name') || '',
+                                    email: this.leadgenData.get('email') || '',
+                                    ats_score: response.ats_score,
+                                    job_fit_score: response.job_fit_score,
+                                    pdf_url: response.pdf_url
+                                }),
+                                timeout: 8000
+                            });
+                            
+                            Utils.debug('Email dispatched successfully via WordPress');
+                        } catch (emailError) {
+                            Utils.debug('Email dispatch failed:', emailError);
+                        }
+
                 // Redirect to thank you page with scores
                 const thankYouUrl = `/resume-submission/?ats=${encodeURIComponent(response.ats_score)}&fit=${encodeURIComponent(response.job_fit_score)}`;
                 window.location.href = thankYouUrl;

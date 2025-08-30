@@ -28,7 +28,8 @@ function jobready_enqueue_assets() {
         'jobready-script',
         'jobreadyRest',
         array(
-            'restUrl' => esc_url_raw( rest_url( 'jobready/v1/send-report' ) ),
+            'restUrl' => esc_url_raw( rest_url( 'jobready/v1/leads' ) ),
+            'emailUrl' => esc_url_raw( rest_url( 'jobready/v1/send-report' ) ),
             'nonce'   => wp_create_nonce( 'wp_rest' ),
             'token'   => $token,
         )
