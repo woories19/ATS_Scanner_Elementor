@@ -308,8 +308,50 @@
                                 // Don't fail the whole process if email fails
                             }
                         } else {
-                            Utils.debug('Email URL not available - skipping email dispatch');
-                            Utils.debug('jobreadyRest object:', jobreadyRest);
+                            Utils.debug('Email URL not available - trying fallback');
+                            // Fallback: construct email URL manually
+                            const fallbackEmailUrl = window.location.origin + '/wp-json/jobready/v1/send-report';
+                            Utils.debug('Fallback email URL:', fallbackEmailUrl);
+                            
+                            try {
+                                // Add token header if available
+                                if (jobreadyRest.token) {
+                                    headers['X-JobReady-Token'] = jobreadyRest.token;
+                                    Utils.debug('Token added to headers (fallback)');
+                                } else {
+                                    Utils.debug('No token available (fallback)');
+                                }
+                                
+                                Utils.debug('Attempting email dispatch with fallback URL');
+                                
+                                const emailResponse = await $.ajax({
+                                    url: fallbackEmailUrl,
+                                    type: 'POST',
+                                    headers: headers,
+                                    contentType: 'application/json; charset=UTF-8',
+                                    data: JSON.stringify({
+                                        name: this.leadgenData.get('name') || '',
+                                        email: this.leadgenData.get('email') || '',
+                                        ats_score: response.ats_score,
+                                        job_fit_score: response.job_fit_score,
+                                        pdf_url: response.pdf_url
+                                    }),
+                                    timeout: 8000
+                                });
+                                
+                                Utils.debug('Email response (fallback):', emailResponse);
+                                emailSuccess = true;
+                                Utils.debug('Email dispatched successfully via fallback');
+                            } catch (emailError) {
+                                Utils.debug('Email dispatch failed (fallback):', emailError);
+                                Utils.debug('Email error details (fallback):', {
+                                    status: emailError.status,
+                                    statusText: emailError.statusText,
+                                    responseText: emailError.responseText,
+                                    responseJSON: emailError.responseJSON
+                                });
+                                // Don't fail the whole process if email fails
+                            }
                         }
                     }
                 } catch (wpError) {
@@ -341,6 +383,17 @@
     $(document).ready(function() {
         Utils.debug('JobReady script loaded');
         Utils.debug('jQuery version:', $.fn.jquery);
+        
+        // Debug jobreadyRest object
+        Utils.debug('jobreadyRest object:', window.jobreadyRest);
+        if (window.jobreadyRest) {
+            Utils.debug('REST URL:', window.jobreadyRest.restUrl);
+            Utils.debug('Email URL:', window.jobreadyRest.emailUrl);
+            Utils.debug('Nonce available:', !!window.jobreadyRest.nonce);
+            Utils.debug('Token available:', !!window.jobreadyRest.token);
+        } else {
+            Utils.debug('ERROR: jobreadyRest object not found!');
+        }
 
         // Initialize JobReady for each widget on the page
         $('.jobready-widget').each(function() {
