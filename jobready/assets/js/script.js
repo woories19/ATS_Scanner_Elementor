@@ -259,99 +259,166 @@
                         wpSuccess = true;
                         Utils.debug('Lead stored successfully in WordPress');
                         
-                        // Now dispatch email via WordPress REST endpoint
-                        if (jobreadyRest.emailUrl) {
-                            Utils.debug('Email URL available:', jobreadyRest.emailUrl);
-                            try {
-                                // Add token header if available
-                                if (jobreadyRest.token) {
-                                    headers['X-JobReady-Token'] = jobreadyRest.token;
-                                    Utils.debug('Token added to headers');
-                                } else {
-                                    Utils.debug('No token available');
-                                }
-                                
-                                Utils.debug('Attempting email dispatch with data:', {
+                        // ALWAYS attempt email dispatch regardless of WordPress integration success
+                        Utils.debug('Starting email dispatch process...');
+                        
+                        // Method 1: Try WordPress REST API
+                        let emailSent = false;
+                        
+                        try {
+                            // Prepare headers for email dispatch
+                            const emailHeaders = { 'X-WP-Nonce': jobreadyRest?.nonce || '' };
+                            
+                            // Add token header if available
+                            if (jobreadyRest?.token) {
+                                emailHeaders['X-JobReady-Token'] = jobreadyRest.token;
+                                Utils.debug('Token added to email headers');
+                            } else {
+                                Utils.debug('No token available for email');
+                            }
+                            
+                            // Determine email URL
+                            let emailUrl = jobreadyRest?.emailUrl;
+                            if (!emailUrl) {
+                                emailUrl = window.location.origin + '/wp-json/jobready/v1/send-report';
+                                Utils.debug('Using fallback email URL:', emailUrl);
+                            } else {
+                                Utils.debug('Using provided email URL:', emailUrl);
+                            }
+                            
+                            Utils.debug('Attempting email dispatch with data:', {
+                                name: this.leadgenData.get('name') || '',
+                                email: this.leadgenData.get('email') || '',
+                                ats_score: response.ats_score,
+                                job_fit_score: response.job_fit_score,
+                                pdf_url: response.pdf_url
+                            });
+                            
+                            const emailResponse = await $.ajax({
+                                url: emailUrl,
+                                type: 'POST',
+                                headers: emailHeaders,
+                                contentType: 'application/json; charset=UTF-8',
+                                data: JSON.stringify({
                                     name: this.leadgenData.get('name') || '',
                                     email: this.leadgenData.get('email') || '',
                                     ats_score: response.ats_score,
                                     job_fit_score: response.job_fit_score,
                                     pdf_url: response.pdf_url
-                                });
-                                
-                                const emailResponse = await $.ajax({
-                                    url: jobreadyRest.emailUrl,
+                                }),
+                                timeout: 10000
+                            });
+                            
+                            Utils.debug('Email response:', emailResponse);
+                            emailSuccess = true;
+                            emailSent = true;
+                            Utils.debug('Email dispatched successfully via WordPress REST API!');
+                        } catch (emailError) {
+                            Utils.debug('Email dispatch failed via WordPress REST API:', emailError);
+                            Utils.debug('Email error details:', {
+                                status: emailError.status,
+                                statusText: emailError.statusText,
+                                responseText: emailError.responseText,
+                                responseJSON: emailError.responseJSON
+                            });
+                        }
+                        
+                        // Method 2: Try direct AJAX to WordPress admin-ajax.php as fallback
+                        if (!emailSent) {
+                            Utils.debug('Trying fallback email method via admin-ajax.php...');
+                            try {
+                                const fallbackResponse = await $.ajax({
+                                    url: window.location.origin + '/wp-admin/admin-ajax.php',
                                     type: 'POST',
-                                    headers: headers,
-                                    contentType: 'application/json; charset=UTF-8',
-                                    data: JSON.stringify({
+                                    data: {
+                                        action: 'jobready_send_email_fallback',
                                         name: this.leadgenData.get('name') || '',
                                         email: this.leadgenData.get('email') || '',
                                         ats_score: response.ats_score,
                                         job_fit_score: response.job_fit_score,
-                                        pdf_url: response.pdf_url
-                                    }),
-                                    timeout: 8000
+                                        pdf_url: response.pdf_url,
+                                        nonce: jobreadyRest?.nonce || ''
+                                    },
+                                    timeout: 10000
                                 });
                                 
-                                Utils.debug('Email response:', emailResponse);
-                                emailSuccess = true;
-                                Utils.debug('Email dispatched successfully via WordPress');
-                            } catch (emailError) {
-                                Utils.debug('Email dispatch failed:', emailError);
-                                Utils.debug('Email error details:', {
-                                    status: emailError.status,
-                                    statusText: emailError.statusText,
-                                    responseText: emailError.responseText,
-                                    responseJSON: emailError.responseJSON
-                                });
-                                // Don't fail the whole process if email fails
-                            }
-                        } else {
-                            Utils.debug('Email URL not available - trying fallback');
-                            // Fallback: construct email URL manually
-                            const fallbackEmailUrl = window.location.origin + '/wp-json/jobready/v1/send-report';
-                            Utils.debug('Fallback email URL:', fallbackEmailUrl);
-                            
-                            try {
-                                // Add token header if available
-                                if (jobreadyRest.token) {
-                                    headers['X-JobReady-Token'] = jobreadyRest.token;
-                                    Utils.debug('Token added to headers (fallback)');
+                                Utils.debug('Fallback email response:', fallbackResponse);
+                                if (fallbackResponse.success) {
+                                    emailSuccess = true;
+                                    emailSent = true;
+                                    Utils.debug('Email dispatched successfully via fallback method!');
                                 } else {
-                                    Utils.debug('No token available (fallback)');
+                                    Utils.debug('Fallback email failed:', fallbackResponse);
+                                }
+                            } catch (fallbackError) {
+                                Utils.debug('Fallback email dispatch failed:', fallbackError);
+                            }
+                        }
+                        
+                        // Method 3: Try simple form submission as last resort
+                        if (!emailSent) {
+                            Utils.debug('Trying last resort email method...');
+                            try {
+                                // Create a hidden form and submit it
+                                const form = document.createElement('form');
+                                form.method = 'POST';
+                                form.action = window.location.origin + '/wp-admin/admin-ajax.php';
+                                form.style.display = 'none';
+                                
+                                const fields = {
+                                    action: 'jobready_send_email_fallback',
+                                    name: this.leadgenData.get('name') || '',
+                                    email: this.leadgenData.get('email') || '',
+                                    ats_score: response.ats_score,
+                                    job_fit_score: response.job_fit_score,
+                                    pdf_url: response.pdf_url,
+                                    nonce: jobreadyRest?.nonce || ''
+                                };
+                                
+                                for (const [key, value] of Object.entries(fields)) {
+                                    const input = document.createElement('input');
+                                    input.type = 'hidden';
+                                    input.name = key;
+                                    input.value = value;
+                                    form.appendChild(input);
                                 }
                                 
-                                Utils.debug('Attempting email dispatch with fallback URL');
+                                document.body.appendChild(form);
                                 
-                                const emailResponse = await $.ajax({
-                                    url: fallbackEmailUrl,
-                                    type: 'POST',
-                                    headers: headers,
-                                    contentType: 'application/json; charset=UTF-8',
-                                    data: JSON.stringify({
-                                        name: this.leadgenData.get('name') || '',
-                                        email: this.leadgenData.get('email') || '',
-                                        ats_score: response.ats_score,
-                                        job_fit_score: response.job_fit_score,
-                                        pdf_url: response.pdf_url
-                                    }),
-                                    timeout: 8000
+                                // Submit form in background
+                                const formResponse = await new Promise((resolve, reject) => {
+                                    const iframe = document.createElement('iframe');
+                                    iframe.style.display = 'none';
+                                    iframe.name = 'email_iframe';
+                                    form.target = 'email_iframe';
+                                    
+                                    iframe.onload = () => {
+                                        document.body.removeChild(iframe);
+                                        document.body.removeChild(form);
+                                        resolve({ success: true });
+                                    };
+                                    
+                                    iframe.onerror = () => {
+                                        document.body.removeChild(iframe);
+                                        document.body.removeChild(form);
+                                        reject(new Error('Form submission failed'));
+                                    };
+                                    
+                                    document.body.appendChild(iframe);
+                                    form.submit();
                                 });
                                 
-                                Utils.debug('Email response (fallback):', emailResponse);
+                                Utils.debug('Form submission response:', formResponse);
                                 emailSuccess = true;
-                                Utils.debug('Email dispatched successfully via fallback');
-                            } catch (emailError) {
-                                Utils.debug('Email dispatch failed (fallback):', emailError);
-                                Utils.debug('Email error details (fallback):', {
-                                    status: emailError.status,
-                                    statusText: emailError.statusText,
-                                    responseText: emailError.responseText,
-                                    responseJSON: emailError.responseJSON
-                                });
-                                // Don't fail the whole process if email fails
+                                emailSent = true;
+                                Utils.debug('Email dispatched successfully via form submission!');
+                            } catch (formError) {
+                                Utils.debug('Form submission email dispatch failed:', formError);
                             }
+                        }
+                        
+                        if (!emailSent) {
+                            Utils.debug('All email dispatch methods failed!');
                         }
                     }
                 } catch (wpError) {

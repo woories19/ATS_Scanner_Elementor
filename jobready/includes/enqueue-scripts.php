@@ -4,6 +4,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 function jobready_enqueue_assets() {
+    // Debug logging
+    error_log('[JobReady] Enqueue function called');
+    
     wp_enqueue_script('jquery');
     
     wp_enqueue_style(
@@ -44,6 +47,13 @@ function jobready_enqueue_assets() {
             'token'   => $token,
         )
     );
+    
+    error_log('[JobReady] wp_localize_script called');
 }
+
+// Load on ALL frontend pages, not just when widget is present
 add_action( 'wp_enqueue_scripts', 'jobready_enqueue_assets' );
 add_action( 'elementor/editor/after_enqueue_scripts', 'jobready_enqueue_assets' );
+
+// Also load on admin pages for testing
+add_action( 'admin_enqueue_scripts', 'jobready_enqueue_assets' );

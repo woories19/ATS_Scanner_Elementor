@@ -10,6 +10,98 @@ function jobready_register_rest_routes() {
 }
 add_action( 'rest_api_init', 'jobready_register_rest_routes' );
 
+// Add fallback email handler for admin-ajax.php
+add_action( 'wp_ajax_jobready_send_email_fallback', 'jobready_handle_email_fallback' );
+add_action( 'wp_ajax_nopriv_jobready_send_email_fallback', 'jobready_handle_email_fallback' );
+
+function jobready_handle_email_fallback() {
+    // Debug logging
+    error_log('[JobReady] Fallback email handler called');
+    error_log('[JobReady] POST data: ' . print_r($_POST, true));
+    
+    // Verify nonce
+    if (!wp_verify_nonce($_POST['nonce'], 'wp_rest')) {
+        error_log('[JobReady] Fallback email - nonce verification failed');
+        wp_die('Nonce verification failed');
+    }
+    
+    $name = sanitize_text_field($_POST['name']);
+    $email = sanitize_email($_POST['email']);
+    $ats_score = intval($_POST['ats_score']);
+    $fit_score = intval($_POST['job_fit_score']);
+    $pdf_url_raw = sanitize_text_field($_POST['pdf_url']);
+    
+    error_log('[JobReady] Fallback email params - Name: ' . $name . ', Email: ' . $email . ', ATS: ' . $ats_score . ', Fit: ' . $fit_score . ', PDF: ' . $pdf_url_raw);
+    
+    if (empty($email) || !is_email($email)) {
+        error_log('[JobReady] Fallback email - Invalid email: ' . $email);
+        wp_send_json_error('Invalid email address');
+        return;
+    }
+    
+    if (empty($pdf_url_raw)) {
+        error_log('[JobReady] Fallback email - Missing PDF URL');
+        wp_send_json_error('Missing PDF URL');
+        return;
+    }
+    
+    $pdf_url = esc_url_raw(jobready_make_absolute_url($pdf_url_raw));
+    error_log('[JobReady] Fallback email - Processed PDF URL: ' . $pdf_url);
+    
+    $subject = sprintf('Your JobReady Report (ATS %d | Fit %d)', $ats_score, $fit_score);
+    
+    // Build HTML body
+    $body = '';
+    $body .= '<p>Hi ' . esc_html($name ? $name : 'there') . ',</p>';
+    $body .= '<p>Thanks for using <strong>JobReady</strong>. Your resume has been analyzed.</p>';
+    $body .= '<ul>';
+    $body .= '<li><strong>ATS Score:</strong> ' . intval($ats_score) . '%</li>';
+    $body .= '<li><strong>Job Fit Score:</strong> ' . intval($fit_score) . '%</li>';
+    $body .= '</ul>';
+    $body .= '<p>You can download your full PDF report here:<br/>';
+    $body .= '<a href="' . esc_url($pdf_url) . '" target="_blank" rel="noopener">' . esc_html($pdf_url) . '</a></p>';
+    $body .= '<p>We also attached the report for your convenience.</p>';
+    $body .= '<p>— Mazin Digital</p>';
+    
+    $headers = array('Content-Type: text/html; charset=UTF-8');
+    
+    // Attempt to download the PDF and attach
+    $attachments = array();
+    $tmp_file = '';
+    if (function_exists('download_url')) {
+        include_once ABSPATH . 'wp-admin/includes/file.php';
+        error_log('[JobReady] Fallback email - Attempting to download PDF from: ' . $pdf_url);
+        $tmp_file = download_url($pdf_url, 20);
+        if (!is_wp_error($tmp_file) && file_exists($tmp_file)) {
+            $attachments[] = $tmp_file;
+            error_log('[JobReady] Fallback email - PDF attachment downloaded successfully: ' . $tmp_file);
+        } else {
+            error_log('[JobReady] Fallback email - PDF attachment download failed: ' . print_r($tmp_file, true));
+        }
+    } else {
+        error_log('[JobReady] Fallback email - download_url function not available');
+    }
+    
+    error_log('[JobReady] Fallback email - About to call wp_mail - Email: ' . $email . ', Subject: ' . $subject . ', Attachments: ' . count($attachments));
+    $sent = wp_mail($email, $subject, $body, $headers, $attachments);
+    
+    error_log('[JobReady] Fallback email - wp_mail result: ' . ($sent ? 'SUCCESS' : 'FAILED'));
+    
+    if (!empty($tmp_file) && file_exists($tmp_file)) {
+        @unlink($tmp_file);
+        error_log('[JobReady] Fallback email - Temporary file cleaned up: ' . $tmp_file);
+    }
+    
+    if (!$sent) {
+        error_log('[JobReady] Fallback email - Email send failed');
+        wp_send_json_error('Email send failed');
+        return;
+    }
+    
+    error_log('[JobReady] Fallback email - Email sent successfully');
+    wp_send_json_success('Email sent successfully');
+}
+
 function jobready_make_absolute_url( $url ) {
     $u = (string) $url;
     if ( $u === '' ) return $u;
