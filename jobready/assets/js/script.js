@@ -7,7 +7,7 @@
 
     // Configuration
     const CONFIG = {
-        DEBUG: false,
+        DEBUG: true, // Changed to true for debugging
         TIMEOUT: 30000,
         MAX_FILE_SIZE: 5 * 1024 * 1024, // 5MB
         ALLOWED_TYPES: ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
@@ -261,11 +261,23 @@
                         
                         // Now dispatch email via WordPress REST endpoint
                         if (jobreadyRest.emailUrl) {
+                            Utils.debug('Email URL available:', jobreadyRest.emailUrl);
                             try {
                                 // Add token header if available
                                 if (jobreadyRest.token) {
                                     headers['X-JobReady-Token'] = jobreadyRest.token;
+                                    Utils.debug('Token added to headers');
+                                } else {
+                                    Utils.debug('No token available');
                                 }
+                                
+                                Utils.debug('Attempting email dispatch with data:', {
+                                    name: this.leadgenData.get('name') || '',
+                                    email: this.leadgenData.get('email') || '',
+                                    ats_score: response.ats_score,
+                                    job_fit_score: response.job_fit_score,
+                                    pdf_url: response.pdf_url
+                                });
                                 
                                 const emailResponse = await $.ajax({
                                     url: jobreadyRest.emailUrl,
@@ -282,14 +294,22 @@
                                     timeout: 8000
                                 });
                                 
+                                Utils.debug('Email response:', emailResponse);
                                 emailSuccess = true;
                                 Utils.debug('Email dispatched successfully via WordPress');
                             } catch (emailError) {
                                 Utils.debug('Email dispatch failed:', emailError);
+                                Utils.debug('Email error details:', {
+                                    status: emailError.status,
+                                    statusText: emailError.statusText,
+                                    responseText: emailError.responseText,
+                                    responseJSON: emailError.responseJSON
+                                });
                                 // Don't fail the whole process if email fails
                             }
                         } else {
                             Utils.debug('Email URL not available - skipping email dispatch');
+                            Utils.debug('jobreadyRest object:', jobreadyRest);
                         }
                     }
                 } catch (wpError) {
