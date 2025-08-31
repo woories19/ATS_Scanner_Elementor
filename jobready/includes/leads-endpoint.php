@@ -45,6 +45,11 @@ add_action( 'rest_api_init', 'jobready_register_leads_rest_routes' );
 
 // Handle storing a new lead
 function jobready_handle_store_lead( WP_REST_Request $request ) {
+    // Debug logging
+    error_log('[JobReady] Leads endpoint called');
+    error_log('[JobReady] Request headers: ' . print_r($request->get_headers(), true));
+    error_log('[JobReady] Request params: ' . print_r($request->get_params(), true));
+    
     // Get and validate parameters
     $name = sanitize_text_field( $request->get_param( 'name' ) );
     $email = sanitize_email( $request->get_param( 'email' ) );
@@ -55,33 +60,42 @@ function jobready_handle_store_lead( WP_REST_Request $request ) {
     $job_description = sanitize_textarea_field( $request->get_param( 'job_description' ) );
     $consent_given = $request->get_param( 'consent_given' );
     
+    error_log('[JobReady] Parsed lead params - Name: ' . $name . ', Email: ' . $email . ', ATS: ' . $ats_score . ', Fit: ' . $job_fit_score);
+    
     // Validate required fields
     if ( empty( $email ) || ! is_email( $email ) ) {
+        error_log('[JobReady] Invalid email: ' . $email);
         return new WP_REST_Response( array( 'error' => 'Valid email is required' ), 400 );
     }
     
     if ( empty( $name ) ) {
+        error_log('[JobReady] Missing name');
         return new WP_REST_Response( array( 'error' => 'Name is required' ), 400 );
     }
     
     if ( empty( $pdf_url ) ) {
+        error_log('[JobReady] Missing PDF URL');
         return new WP_REST_Response( array( 'error' => 'PDF URL is required' ), 400 );
     }
     
     if ( empty( $resume_filename ) ) {
+        error_log('[JobReady] Missing resume filename');
         return new WP_REST_Response( array( 'error' => 'Resume filename is required' ), 400 );
     }
     
     if ( empty( $job_description ) ) {
+        error_log('[JobReady] Missing job description');
         return new WP_REST_Response( array( 'error' => 'Job description is required' ), 400 );
     }
     
     // Validate scores
     if ( $ats_score < 0 || $ats_score > 100 ) {
+        error_log('[JobReady] Invalid ATS score: ' . $ats_score);
         return new WP_REST_Response( array( 'error' => 'ATS score must be between 0 and 100' ), 400 );
     }
     
     if ( $job_fit_score < 0 || $job_fit_score > 100 ) {
+        error_log('[JobReady] Invalid job fit score: ' . $job_fit_score);
         return new WP_REST_Response( array( 'error' => 'Job fit score must be between 0 and 100' ), 400 );
     }
     
@@ -97,13 +111,18 @@ function jobready_handle_store_lead( WP_REST_Request $request ) {
         'consent_given' => $consent_given !== 'false' ? 1 : 0
     );
     
+    error_log('[JobReady] Attempting to store lead data');
+    
     // Store the lead
     $lead_id = jobready_store_lead( $lead_data );
     
     if ( is_wp_error( $lead_id ) ) {
         jobready_log( 'Failed to store lead: ' . $lead_id->get_error_message() );
+        error_log('[JobReady] Lead storage failed: ' . $lead_id->get_error_message());
         return new WP_REST_Response( array( 'error' => $lead_id->get_error_message() ), 500 );
     }
+    
+    error_log('[JobReady] Lead stored successfully with ID: ' . $lead_id);
     
     // Attempt to mirror to Google Sheets if configured (non-blocking)
     jobready_mirror_to_google_sheets( $lead_data );

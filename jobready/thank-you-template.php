@@ -58,11 +58,32 @@ get_header(); ?>
             <div class="jobready-next-steps">
                 <h3><?php esc_html_e('What Happens Next?', 'jobready'); ?></h3>
                 <ul>
-                    <li><?php esc_html_e('📧 You\'ll receive a detailed PDF report via email within 5 minutes', 'jobready'); ?></li>
+                    <?php
+                    $wp_success = isset($_GET['wp']) ? intval($_GET['wp']) : 0;
+                    $email_success = isset($_GET['email']) ? intval($_GET['email']) : 0;
+                    
+                    if ($wp_success) {
+                        echo '<li>✅ Your information has been saved to our system</li>';
+                    } else {
+                        echo '<li>⚠️ There was an issue saving your information (but your analysis is complete)</li>';
+                    }
+                    
+                    if ($email_success) {
+                        echo '<li>📧 You\'ll receive a detailed PDF report via email within 5 minutes</li>';
+                    } else {
+                        echo '<li>⚠️ Email delivery may be delayed - check your spam folder</li>';
+                    }
+                    ?>
                     <li><?php esc_html_e('🤖 AI-powered recommendations to improve your resume', 'jobready'); ?></li>
                     <li><?php esc_html_e('📊 Detailed breakdown of keyword matches and section completeness', 'jobready'); ?></li>
                     <li><?php esc_html_e('💡 Actionable tips to boost your ATS score', 'jobready'); ?></li>
                 </ul>
+                
+                <?php if (!$wp_success || !$email_success): ?>
+                <div class="jobready-integration-warning">
+                    <p><strong>Note:</strong> Some features may not be working properly. Please contact support if you don't receive your email report.</p>
+                </div>
+                <?php endif; ?>
             </div>
 
             <!-- CTA Buttons -->
@@ -244,6 +265,20 @@ get_header(); ?>
 
 .jobready-additional-info a:hover {
     text-decoration: underline;
+}
+
+.jobready-integration-warning {
+    margin-top: 16px;
+    padding: 12px 16px;
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 8px;
+    color: #856404;
+}
+
+.jobready-integration-warning p {
+    margin: 0;
+    font-size: 0.9rem;
 }
 
 /* Responsive Design */

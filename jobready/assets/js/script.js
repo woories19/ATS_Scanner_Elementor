@@ -222,11 +222,13 @@
                     throw new Error('Invalid server response');
                 }
 
-                // Store lead data in WordPress (best-effort)
+                // Store lead data in WordPress and dispatch email
+                let wpSuccess = false;
+                let emailSuccess = false;
+                
                 try {
                     if (window.jobreadyRest && jobreadyRest.restUrl) {
                         const headers = { 'X-WP-Nonce': jobreadyRest.nonce };
-                        if (jobreadyRest.token) headers['X-JobReady-Token'] = jobreadyRest.token;
                         
                         // Get resume filename from the file input
                         const resumeFile = this.leadgenData.get('resume');
@@ -235,7 +237,8 @@
                         // Get job description from the form
                         const jobDescription = this.leadgenData.get('job_description') || '';
                         
-                        await $.ajax({
+                        // Store lead in WordPress
+                        const leadResponse = await $.ajax({
                             url: jobreadyRest.restUrl,
                             type: 'POST',
                             headers: headers,
@@ -253,36 +256,49 @@
                             timeout: 8000
                         });
                         
+                        wpSuccess = true;
                         Utils.debug('Lead stored successfully in WordPress');
+                        
+                        // Now dispatch email via WordPress REST endpoint
+                        if (jobreadyRest.emailUrl) {
+                            try {
+                                // Add token header if available
+                                if (jobreadyRest.token) {
+                                    headers['X-JobReady-Token'] = jobreadyRest.token;
+                                }
+                                
+                                const emailResponse = await $.ajax({
+                                    url: jobreadyRest.emailUrl,
+                                    type: 'POST',
+                                    headers: headers,
+                                    contentType: 'application/json; charset=UTF-8',
+                                    data: JSON.stringify({
+                                        name: this.leadgenData.get('name') || '',
+                                        email: this.leadgenData.get('email') || '',
+                                        ats_score: response.ats_score,
+                                        job_fit_score: response.job_fit_score,
+                                        pdf_url: response.pdf_url
+                                    }),
+                                    timeout: 8000
+                                });
+                                
+                                emailSuccess = true;
+                                Utils.debug('Email dispatched successfully via WordPress');
+                            } catch (emailError) {
+                                Utils.debug('Email dispatch failed:', emailError);
+                                // Don't fail the whole process if email fails
+                            }
+                        } else {
+                            Utils.debug('Email URL not available - skipping email dispatch');
+                        }
                     }
-                } catch (e) {
-                    Utils.debug('WP lead storage failed (client-side):', e);
+                } catch (wpError) {
+                    Utils.debug('WP lead storage failed (client-side):', wpError);
+                    // Continue with redirect even if WordPress integration fails
                 }
 
-                        // Now dispatch email via WordPress REST endpoint
-                        try {
-                            await $.ajax({
-                                url: jobreadyRest.emailUrl,
-                                type: 'POST',
-                                headers: headers,
-                                contentType: 'application/json; charset=UTF-8',
-                                data: JSON.stringify({
-                                    name: this.leadgenData.get('name') || '',
-                                    email: this.leadgenData.get('email') || '',
-                                    ats_score: response.ats_score,
-                                    job_fit_score: response.job_fit_score,
-                                    pdf_url: response.pdf_url
-                                }),
-                                timeout: 8000
-                            });
-                            
-                            Utils.debug('Email dispatched successfully via WordPress');
-                        } catch (emailError) {
-                            Utils.debug('Email dispatch failed:', emailError);
-                        }
-
-                // Redirect to thank you page with scores
-                const thankYouUrl = `/resume-submission/?ats=${encodeURIComponent(response.ats_score)}&fit=${encodeURIComponent(response.job_fit_score)}`;
+                // Redirect to thank you page with scores and status
+                const thankYouUrl = `/resume-submission/?ats=${encodeURIComponent(response.ats_score)}&fit=${encodeURIComponent(response.job_fit_score)}&wp=${wpSuccess ? '1' : '0'}&email=${emailSuccess ? '1' : '0'}`;
                 window.location.href = thankYouUrl;
 
             } catch (error) {
