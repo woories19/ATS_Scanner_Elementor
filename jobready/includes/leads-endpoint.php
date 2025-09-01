@@ -229,10 +229,26 @@ function jobready_mirror_to_google_sheets( $lead_data ) {
 // Add REST API nonce and URL to frontend
 function jobready_add_rest_data_to_frontend() {
     if ( ! is_admin() ) {
+        $token = get_option( 'jobready_webhook_token', '' );
+        $email_url = rest_url( 'jobready/v1/send-report' );
+        $rest_url = rest_url( 'jobready/v1/leads' );
+        $nonce = wp_create_nonce( 'wp_rest' );
+        
+        // Debug logging
+        error_log('[JobReady] Setting up jobreadyRest object');
+        error_log('[JobReady] REST URL: ' . $rest_url);
+        error_log('[JobReady] Email URL: ' . $email_url);
+        error_log('[JobReady] Nonce: ' . $nonce);
+        error_log('[JobReady] Token: ' . $token);
+        
         wp_localize_script( 'jobready-script', 'jobreadyRest', array(
-            'restUrl' => rest_url( 'jobready/v1/leads' ),
-            'nonce' => wp_create_nonce( 'wp_rest' ),
+            'restUrl' => $rest_url,
+            'emailUrl' => esc_url_raw( $email_url ),
+            'nonce' => $nonce,
+            'token' => $token,
         ) );
+        
+        error_log('[JobReady] jobreadyRest object configured successfully');
     }
 }
 add_action( 'wp_enqueue_scripts', 'jobready_add_rest_data_to_frontend' );

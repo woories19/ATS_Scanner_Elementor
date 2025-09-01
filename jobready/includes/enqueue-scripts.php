@@ -25,30 +25,9 @@ function jobready_enqueue_assets() {
         true
     );
 
-    $token = get_option( 'jobready_webhook_token', '' );
-    $rest_url = rest_url( 'jobready/v1/leads' );
-    $email_url = rest_url( 'jobready/v1/send-report' );
-    $nonce = wp_create_nonce( 'wp_rest' );
-
     // Debug logging
     error_log('[JobReady] Enqueuing assets');
-    error_log('[JobReady] REST URL: ' . $rest_url);
-    error_log('[JobReady] Email URL: ' . $email_url);
-    error_log('[JobReady] Nonce: ' . $nonce);
-    error_log('[JobReady] Token: ' . $token);
-
-    wp_localize_script(
-        'jobready-script',
-        'jobreadyRest',
-        array(
-            'restUrl' => esc_url_raw( $rest_url ),
-            'emailUrl' => esc_url_raw( $email_url ),
-            'nonce'   => $nonce,
-            'token'   => $token,
-        )
-    );
-    
-    error_log('[JobReady] wp_localize_script called');
+    error_log('[JobReady] Script and styles enqueued successfully');
 }
 
 // Load on ALL frontend pages, not just when widget is present
