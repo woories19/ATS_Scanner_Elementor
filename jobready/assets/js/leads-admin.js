@@ -68,6 +68,10 @@
             $content.html('<div class="jobready-loading">Loading lead details...</div>');
             $modal.show();
             
+            // Debug logging
+            console.log('JobReady: Fetching lead details for ID:', leadId);
+            console.log('JobReady: REST URL:', jobreadyLeadsAdmin.restUrl + '/' + leadId);
+            
             // Fetch lead details via REST API
             $.ajax({
                 url: jobreadyLeadsAdmin.restUrl + '/' + leadId,
@@ -76,15 +80,38 @@
                     'X-WP-Nonce': jobreadyLeadsAdmin.nonce
                 },
                 success: function(response) {
-                    if (response && response.leads && response.leads.length > 0) {
+                    console.log('JobReady: Lead details response:', response);
+                    
+                    if (response && response.id) {
+                        // Single lead response
+                        JobReadyLeadsAdmin.renderLeadDetails(response);
+                    } else if (response && response.leads && response.leads.length > 0) {
+                        // Multiple leads response (fallback)
                         const lead = response.leads[0];
                         JobReadyLeadsAdmin.renderLeadDetails(lead);
                     } else {
-                        $content.html('<div class="jobready-error">Lead not found</div>');
+                        console.error('JobReady: Invalid response format:', response);
+                        $content.html('<div class="jobready-error">Lead not found or invalid response format</div>');
                     }
                 },
                 error: function(xhr, status, error) {
-                    $content.html('<div class="jobready-error">Failed to load lead details: ' + error + '</div>');
+                    console.error('JobReady: Failed to load lead details:', {
+                        status: status,
+                        error: error,
+                        responseText: xhr.responseText,
+                        statusCode: xhr.status
+                    });
+                    
+                    let errorMessage = 'Failed to load lead details: ' + error;
+                    if (xhr.status === 404) {
+                        errorMessage = 'Lead not found';
+                    } else if (xhr.status === 403) {
+                        errorMessage = 'Access denied. Please check your permissions.';
+                    } else if (xhr.status === 500) {
+                        errorMessage = 'Server error. Please try again later.';
+                    }
+                    
+                    $content.html('<div class="jobready-error">' + errorMessage + '</div>');
                 }
             });
         },

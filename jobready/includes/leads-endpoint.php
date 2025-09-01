@@ -7,17 +7,19 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 // Register REST routes for leads
 function jobready_register_leads_rest_routes() {
-    // Store a new lead
-    register_rest_route( 'jobready/v1', '/leads', array(
-        'methods'  => 'POST',
-        'callback' => 'jobready_handle_store_lead',
-        'permission_callback' => '__return_true',
+    // Get lead statistics (admin only) - register first to avoid conflicts
+    register_rest_route( 'jobready/v1', '/leads/stats', array(
+        'methods'  => 'GET',
+        'callback' => 'jobready_handle_get_lead_stats',
+        'permission_callback' => function() {
+            return current_user_can( 'manage_options' );
+        },
     ) );
     
-    // Get leads (admin only)
-    register_rest_route( 'jobready/v1', '/leads', array(
+    // Get a single lead (admin only) - register before general /leads route
+    register_rest_route( 'jobready/v1', '/leads/(?P<id>\d+)', array(
         'methods'  => 'GET',
-        'callback' => 'jobready_handle_get_leads',
+        'callback' => 'jobready_handle_get_lead',
         'permission_callback' => function() {
             return current_user_can( 'manage_options' );
         },
@@ -32,10 +34,17 @@ function jobready_register_leads_rest_routes() {
         },
     ) );
     
-    // Get lead statistics (admin only)
-    register_rest_route( 'jobready/v1', '/leads/stats', array(
+    // Store a new lead
+    register_rest_route( 'jobready/v1', '/leads', array(
+        'methods'  => 'POST',
+        'callback' => 'jobready_handle_store_lead',
+        'permission_callback' => '__return_true',
+    ) );
+    
+    // Get leads (admin only) - register last to avoid conflicts
+    register_rest_route( 'jobready/v1', '/leads', array(
         'methods'  => 'GET',
-        'callback' => 'jobready_handle_get_lead_stats',
+        'callback' => 'jobready_handle_get_leads',
         'permission_callback' => function() {
             return current_user_can( 'manage_options' );
         },
@@ -164,6 +173,33 @@ function jobready_handle_get_leads( WP_REST_Request $request ) {
     $leads_data = jobready_get_leads( $args );
     
     return new WP_REST_Response( $leads_data, 200 );
+}
+
+// Handle getting a single lead (admin only)
+function jobready_handle_get_lead( WP_REST_Request $request ) {
+    // Debug logging
+    error_log('[JobReady] Get single lead endpoint called');
+    error_log('[JobReady] Request headers: ' . print_r($request->get_headers(), true));
+    error_log('[JobReady] Request params: ' . print_r($request->get_params(), true));
+    
+    $lead_id = intval( $request->get_param( 'id' ) );
+    error_log('[JobReady] Requested lead ID: ' . $lead_id);
+    
+    if ( $lead_id <= 0 ) {
+        error_log('[JobReady] Invalid lead ID: ' . $lead_id);
+        return new WP_REST_Response( array( 'error' => 'Invalid lead ID' ), 400 );
+    }
+    
+    $lead = jobready_get_lead( $lead_id );
+    error_log('[JobReady] Retrieved lead: ' . print_r($lead, true));
+    
+    if ( ! $lead ) {
+        error_log('[JobReady] Lead not found for ID: ' . $lead_id);
+        return new WP_REST_Response( array( 'error' => 'Lead not found' ), 404 );
+    }
+    
+    error_log('[JobReady] Successfully returning lead data');
+    return new WP_REST_Response( $lead, 200 );
 }
 
 // Handle deleting a lead (admin only)

@@ -272,7 +272,9 @@ function jobready_leads_admin_page() {
         <div id="jobready-lead-modal" class="jobready-modal" style="display: none;">
             <div class="jobready-modal-content">
                 <span class="jobready-modal-close">&times;</span>
-                <div id="jobready-lead-modal-content"></div>
+                <div id="jobready-lead-modal-content">
+                    <!-- Content will be loaded here -->
+                </div>
             </div>
         </div>
     </div>

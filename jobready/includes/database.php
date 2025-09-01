@@ -175,6 +175,38 @@ function jobready_get_leads($args = array()) {
     );
 }
 
+// Get a single lead by ID
+function jobready_get_lead($lead_id) {
+    global $wpdb;
+    
+    $table_name = $wpdb->prefix . 'jobready_leads';
+    
+    // Debug logging
+    jobready_log('Getting lead with ID: ' . $lead_id);
+    jobready_log('Table name: ' . $table_name);
+    
+    // Validate lead ID
+    $lead_id = intval($lead_id);
+    if ($lead_id <= 0) {
+        jobready_log('Invalid lead ID: ' . $lead_id);
+        return false;
+    }
+    
+    // Get the lead
+    $sql = $wpdb->prepare("SELECT * FROM $table_name WHERE id = %d", $lead_id);
+    jobready_log('SQL query: ' . $sql);
+    
+    $lead = $wpdb->get_row($sql);
+    
+    if (!$lead) {
+        jobready_log('No lead found with ID: ' . $lead_id);
+        return false;
+    }
+    
+    jobready_log('Lead found: ' . print_r($lead, true));
+    return $lead;
+}
+
 // Export leads to CSV
 function jobready_export_leads_csv($args = array()) {
     $leads_data = jobready_get_leads(array_merge($args, array('per_page' => 1000))); // Get more for export
