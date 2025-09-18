@@ -1,6 +1,29 @@
 <?php
 if ( ! defined( 'ABSPATH' ) ) exit;
 
+/**
+ * Render email HTML from a plain .html template with {{placeholders}}
+ *
+ * @param string $template_path
+ * @param array  $vars
+ * @return string
+ */
+function jobready_render_email_template( $template_path, array $vars ) {
+    if ( ! file_exists( $template_path ) ) {
+        return '';
+    }
+    $html = (string) file_get_contents( $template_path );
+    // Build replacements for {{key}}
+    $replacements = array();
+    foreach ( $vars as $key => $value ) {
+        // Ensure scalar strings for replacement
+        if ( is_scalar( $value ) ) {
+            $replacements['{{' . $key . '}}'] = (string) $value;
+        }
+    }
+    return strtr( $html, $replacements );
+}
+
 function jobready_register_rest_routes() {
     register_rest_route( 'jobready/v1', '/send-report', array(
         'methods'  => 'POST',
@@ -50,18 +73,36 @@ function jobready_handle_email_fallback() {
     
     $subject = sprintf('Your JobReady Report (ATS %d | Fit %d)', $ats_score, $fit_score);
     
-    // Build HTML body
-    $body = '';
-    $body .= '<p>Hi ' . esc_html($name ? $name : 'there') . ',</p>';
-    $body .= '<p>Thanks for using <strong>JobReady</strong>. Your resume has been analyzed.</p>';
-    $body .= '<ul>';
-    $body .= '<li><strong>ATS Score:</strong> ' . intval($ats_score) . '%</li>';
-    $body .= '<li><strong>Job Fit Score:</strong> ' . intval($fit_score) . '%</li>';
-    $body .= '</ul>';
-    $body .= '<p>You can download your full PDF report here:<br/>';
-    $body .= '<a href="' . esc_url($pdf_url) . '" target="_blank" rel="noopener">' . esc_html($pdf_url) . '</a></p>';
-    $body .= '<p>We also attached the report for your convenience.</p>';
-    $body .= '<p>— Mazin Digital</p>';
+    // Build HTML body using external HTML template if available
+    $template_path = defined('JOBREADY_PATH') ? JOBREADY_PATH . 'assets/html/email-report-template.html' : '';
+    error_log('[JobReady] Fallback email - template path: ' . $template_path);
+    if ( function_exists('jobready_log') ) { jobready_log('Fallback email - template path: ' . $template_path); }
+    $vars = array(
+        'name' => esc_html( $name ? $name : 'there' ),
+        'email' => esc_html( $email ),
+        'ats_score' => intval( $ats_score ),
+        'fit_score' => intval( $fit_score ),
+        'pdf_url' => esc_url( $pdf_url ),
+        'subject' => esc_html( $subject ),
+        'site_name' => esc_html( get_bloginfo('name') ),
+        'site_url' => esc_url( home_url('/') ),
+    );
+    $body = $template_path ? jobready_render_email_template( $template_path, $vars ) : '';
+    error_log('[JobReady] Fallback email - template exists: ' . ( $template_path && file_exists($template_path) ? 'yes' : 'no' ) . ', rendered length: ' . strlen($body));
+    if ( function_exists('jobready_log') ) { jobready_log('Fallback email - template exists: ' . ( $template_path && file_exists($template_path) ? 'yes' : 'no' ) . ', rendered length: ' . strlen($body)); }
+    if ($body === '') {
+        $body = '';
+        $body .= '<p>Hi ' . esc_html($name ? $name : 'there') . ',</p>';
+        $body .= '<p>Thanks for using <strong>JobReady</strong>. Your resume has been analyzed.</p>';
+        $body .= '<ul>';
+        $body .= '<li><strong>ATS Score:</strong> ' . intval($ats_score) . '%</li>';
+        $body .= '<li><strong>Job Fit Score:</strong> ' . intval($fit_score) . '%</li>';
+        $body .= '</ul>';
+        $body .= '<p>You can download your full PDF report here:<br/>';
+        $body .= '<a href="' . esc_url($pdf_url) . '" target="_blank" rel="noopener">' . esc_html($pdf_url) . '</a></p>';
+        $body .= '<p>We also attached the report for your convenience.</p>';
+        $body .= '<p>— Mazin Digital</p>';
+    }
     
     $headers = array('Content-Type: text/html; charset=UTF-8');
     
@@ -157,18 +198,36 @@ function jobready_handle_send_report( WP_REST_Request $request ) {
 
     $subject = sprintf( 'Your JobReady Report (ATS %d | Fit %d)', $ats_score, $fit_score );
 
-    // Build HTML body
-    $body  = '';
-    $body .= '<p>Hi ' . esc_html( $name ? $name : 'there' ) . ',</p>';
-    $body .= '<p>Thanks for using <strong>JobReady</strong>. Your resume has been analyzed.</p>';
-    $body .= '<ul>';
-    $body .= '<li><strong>ATS Score:</strong> ' . intval( $ats_score ) . '%</li>';
-    $body .= '<li><strong>Job Fit Score:</strong> ' . intval( $fit_score ) . '%</li>';
-    $body .= '</ul>';
-    $body .= '<p>You can download your full PDF report here:<br/>';
-    $body .= '<a href="' . esc_url( $pdf_url ) . '" target="_blank" rel="noopener">' . esc_html( $pdf_url ) . '</a></p>';
-    $body .= '<p>We also attached the report for your convenience.</p>';
-    $body .= '<p>— Mazin Digital</p>';
+    // Build HTML body using external HTML template if available
+    $template_path = defined('JOBREADY_PATH') ? JOBREADY_PATH . 'assets/html/email-report-template.html' : '';
+    error_log('[JobReady] REST email - template path: ' . $template_path);
+    if ( function_exists('jobready_log') ) { jobready_log('REST email - template path: ' . $template_path); }
+    $vars = array(
+        'name' => esc_html( $name ? $name : 'there' ),
+        'email' => esc_html( $email ),
+        'ats_score' => intval( $ats_score ),
+        'fit_score' => intval( $fit_score ),
+        'pdf_url' => esc_url( $pdf_url ),
+        'subject' => esc_html( $subject ),
+        'site_name' => esc_html( get_bloginfo( 'name' ) ),
+        'site_url' => esc_url( home_url( '/' ) ),
+    );
+    $body = $template_path ? jobready_render_email_template( $template_path, $vars ) : '';
+    error_log('[JobReady] REST email - template exists: ' . ( $template_path && file_exists($template_path) ? 'yes' : 'no' ) . ', rendered length: ' . strlen($body));
+    if ( function_exists('jobready_log') ) { jobready_log('REST email - template exists: ' . ( $template_path && file_exists($template_path) ? 'yes' : 'no' ) . ', rendered length: ' . strlen($body)); }
+    if ( $body === '' ) {
+        $body  = '';
+        $body .= '<p>Hi ' . esc_html( $name ? $name : 'there' ) . ',</p>';
+        $body .= '<p>Thanks for using <strong>JobReady</strong>. Your resume has been analyzed.</p>';
+        $body .= '<ul>';
+        $body .= '<li><strong>ATS Score:</strong> ' . intval( $ats_score ) . '%</li>';
+        $body .= '<li><strong>Job Fit Score:</strong> ' . intval( $fit_score ) . '%</li>';
+        $body .= '</ul>';
+        $body .= '<p>You can download your full PDF report here:<br/>';
+        $body .= '<a href="' . esc_url( $pdf_url ) . '" target="_blank" rel="noopener">' . esc_html( $pdf_url ) . '</a></p>';
+        $body .= '<p>We also attached the report for your convenience.</p>';
+        $body .= '<p>— Mazin Digital</p>';
+    }
 
     $headers = array( 'Content-Type: text/html; charset=UTF-8' );
 

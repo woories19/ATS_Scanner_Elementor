@@ -1,5 +1,7 @@
 <?php
 /**
+ * Template Name: JobReady Results
+ * 
  * JobReady Thank You Page Template
  * Display ATS and Job Fit scores after successful resume analysis
  * 
