@@ -30,6 +30,13 @@ function jobready_register_rest_routes() {
         'callback' => 'jobready_handle_send_report',
         'permission_callback' => '__return_true',
     ) );
+
+    // Public download proxy that forces attachment download using a signed link
+    register_rest_route( 'jobready/v1', '/download', array(
+        'methods'  => 'GET',
+        'callback' => 'jobready_handle_download_proxy',
+        'permission_callback' => '__return_true',
+    ) );
 }
 add_action( 'rest_api_init', 'jobready_register_rest_routes' );
 
@@ -77,12 +84,16 @@ function jobready_handle_email_fallback() {
     $template_path = defined('JOBREADY_PATH') ? JOBREADY_PATH . 'assets/html/email-report-template.html' : '';
     error_log('[JobReady] Fallback email - template path: ' . $template_path);
     if ( function_exists('jobready_log') ) { jobready_log('Fallback email - template path: ' . $template_path); }
+    // Signed download URL via WordPress proxy
+    $download_url = jobready_generate_signed_download_url( $pdf_url );
+
     $vars = array(
         'name' => esc_html( $name ? $name : 'there' ),
         'email' => esc_html( $email ),
         'ats_score' => intval( $ats_score ),
         'fit_score' => intval( $fit_score ),
         'pdf_url' => esc_url( $pdf_url ),
+        'download_url' => esc_url( $download_url ),
         'subject' => esc_html( $subject ),
         'site_name' => esc_html( get_bloginfo('name') ),
         'site_url' => esc_url( home_url('/') ),
@@ -99,7 +110,7 @@ function jobready_handle_email_fallback() {
         $body .= '<li><strong>Job Fit Score:</strong> ' . intval($fit_score) . '%</li>';
         $body .= '</ul>';
         $body .= '<p>You can download your full PDF report here:<br/>';
-        $body .= '<a href="' . esc_url($pdf_url) . '" target="_blank" rel="noopener">' . esc_html($pdf_url) . '</a></p>';
+        $body .= '<a href="' . esc_url($download_url) . '" target="_blank" rel="noopener">' . esc_html($download_url) . '</a></p>';
         $body .= '<p>We also attached the report for your convenience.</p>';
         $body .= '<p>— Mazin Digital</p>';
     }
@@ -198,6 +209,9 @@ function jobready_handle_send_report( WP_REST_Request $request ) {
 
     $subject = sprintf( 'Your JobReady Report (ATS %d | Fit %d)', $ats_score, $fit_score );
 
+    // Build signed download URL that proxies through WordPress (hides origin and forces download)
+    $download_url = jobready_generate_signed_download_url( $pdf_url );
+
     // Build HTML body using external HTML template if available
     $template_path = defined('JOBREADY_PATH') ? JOBREADY_PATH . 'assets/html/email-report-template.html' : '';
     error_log('[JobReady] REST email - template path: ' . $template_path);
@@ -208,6 +222,7 @@ function jobready_handle_send_report( WP_REST_Request $request ) {
         'ats_score' => intval( $ats_score ),
         'fit_score' => intval( $fit_score ),
         'pdf_url' => esc_url( $pdf_url ),
+        'download_url' => esc_url( $download_url ),
         'subject' => esc_html( $subject ),
         'site_name' => esc_html( get_bloginfo( 'name' ) ),
         'site_url' => esc_url( home_url( '/' ) ),
@@ -224,7 +239,7 @@ function jobready_handle_send_report( WP_REST_Request $request ) {
         $body .= '<li><strong>Job Fit Score:</strong> ' . intval( $fit_score ) . '%</li>';
         $body .= '</ul>';
         $body .= '<p>You can download your full PDF report here:<br/>';
-        $body .= '<a href="' . esc_url( $pdf_url ) . '" target="_blank" rel="noopener">' . esc_html( $pdf_url ) . '</a></p>';
+        $body .= '<a href="' . esc_url( $download_url ) . '" target="_blank" rel="noopener">' . esc_html( $download_url ) . '</a></p>';
         $body .= '<p>We also attached the report for your convenience.</p>';
         $body .= '<p>— Mazin Digital</p>';
     }
@@ -265,4 +280,83 @@ function jobready_handle_send_report( WP_REST_Request $request ) {
 
     error_log('[JobReady] Email sent successfully - returning 200');
     return new WP_REST_Response( array( 'status' => 'sent' ), 200 );
+}
+
+// ------------------------
+// Signed download proxy
+// ------------------------
+function jobready_get_download_secret() {
+    $opt = (string) get_option( 'jobready_webhook_token', '' );
+    if ( $opt !== '' ) return $opt;
+    if ( defined( 'AUTH_SALT' ) && AUTH_SALT ) return AUTH_SALT;
+    return wp_salt( 'auth' );
+}
+
+function jobready_generate_signed_download_url( $raw_pdf_url ) {
+    $u  = rawurlencode( rtrim( (string) base64_encode( $raw_pdf_url ), '=' ) );
+    $ts = time();
+    $sig = hash_hmac( 'sha256', $u . '|' . $ts, jobready_get_download_secret() );
+    return add_query_arg( array( 'u' => $u, 'ts' => $ts, 'sig' => $sig ), rest_url( 'jobready/v1/download' ) );
+}
+
+function jobready_handle_download_proxy( WP_REST_Request $request ) {
+    $u   = (string) $request->get_param( 'u' );
+    $ts  = intval( $request->get_param( 'ts' ) );
+    $sig = (string) $request->get_param( 'sig' );
+
+    if ( $u === '' || $ts <= 0 || $sig === '' ) {
+        return new WP_REST_Response( array( 'error' => 'Bad request' ), 400 );
+    }
+
+    // Expire after 12 hours
+    if ( time() - $ts > 43200 ) {
+        return new WP_REST_Response( array( 'error' => 'Link expired' ), 410 );
+    }
+
+    $calc = hash_hmac( 'sha256', $u . '|' . $ts, jobready_get_download_secret() );
+    if ( ! hash_equals( $calc, $sig ) ) {
+        return new WP_REST_Response( array( 'error' => 'Invalid signature' ), 401 );
+    }
+
+    // Decode URL-safe base64 (tolerate missing padding)
+    $padded = $u;
+    $padlen = 4 - ( strlen( $padded ) % 4 );
+    if ( $padlen > 0 && $padlen < 4 ) $padded .= str_repeat( '=', $padlen );
+    $raw_url = base64_decode( rawurldecode( $padded ) );
+    if ( ! $raw_url ) {
+        return new WP_REST_Response( array( 'error' => 'Invalid URL' ), 400 );
+    }
+
+    $pdf_url = jobready_make_absolute_url( $raw_url );
+
+    // Fetch the file server-side
+    $resp = wp_remote_get( $pdf_url, array( 'timeout' => 20 ) );
+    if ( is_wp_error( $resp ) ) {
+        return new WP_REST_Response( array( 'error' => 'Fetch failed' ), 502 );
+    }
+    $code = wp_remote_retrieve_response_code( $resp );
+    if ( $code < 200 || $code >= 300 ) {
+        return new WP_REST_Response( array( 'error' => 'Upstream error', 'status' => $code ), 502 );
+    }
+
+    $body = wp_remote_retrieve_body( $resp );
+    if ( $body === '' ) {
+        return new WP_REST_Response( array( 'error' => 'Empty body' ), 502 );
+    }
+
+    // Derive filename
+    $path = wp_parse_url( $pdf_url, PHP_URL_PATH );
+    $filename = 'jobready-report.pdf';
+    if ( $path ) {
+        $basename = basename( $path );
+        if ( $basename ) $filename = $basename;
+    }
+
+    // Send as attachment
+    nocache_headers();
+    header( 'Content-Type: application/pdf' );
+    header( 'Content-Disposition: attachment; filename="' . sanitize_file_name( $filename ) . '"' );
+    header( 'X-Content-Type-Options: nosniff' );
+    echo $body;
+    exit;
 }

@@ -1,9 +1,13 @@
 <?php
-/**
- * Plugin Name: JobReady - An Elementor Widget By Mazin Digital
+/*
+ * Plugin Name: JobReady - Mazin Digital
+ * Plugin URI:  https://github.com/woories19/ATS_Scanner_Elementor/tree/staging
  * Description: Your personal resume assistant. Upload, scan, and get instant feedback on how job-ready your resume really is.
- * Version: 0.8.8.2
- * Author: <a href="https://mazindigital.com">Mazin Digital</a> | <a href="https://github.com/woories19">GitHub</a>
+ * Author: GitHub
+ * Author URI: https://github.com/woories19
+ * Version: 0.8.9.5
+ * Elementor tested up to: 3.32
+ * Elementor Pro tested up to: 3.32
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

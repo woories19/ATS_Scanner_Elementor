@@ -7,10 +7,12 @@
 
     // Configuration
     const CONFIG = {
-        DEBUG: true, // Changed to true for debugging
+        DEBUG: false, // Disabled in production for performance
         TIMEOUT: 30000,
         MAX_FILE_SIZE: 5 * 1024 * 1024, // 5MB
-        ALLOWED_TYPES: ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+        ALLOWED_TYPES: ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+        LAZY_LOAD: true, // Only initialize when widget is visible or interacted
+        INTERSECTION_THRESHOLD: 0.1 // Start loading when 10% visible
     };
 
     // Utility functions
@@ -75,10 +77,30 @@
                 this.handleFormSubmit();
             });
 
-            // Lead generation form submission
-            this.$widget.on('submit', '.jobready-leadgen-form', (e) => {
+            // Lead generation form submission (modal appended to body)
+            $(document).on('submit', '.jobready-leadgen-form', (e) => {
                 e.preventDefault();
                 this.handleLeadgenSubmit();
+            });
+
+            // Close modal on click outside
+            $(document).on('click', '.jobready-overlay', (e) => {
+                if (e.target === e.currentTarget) {
+                    this.closeLeadgenModal();
+                }
+            });
+
+            // Close modal on X button
+            $(document).on('click', '.jobready-modal-close', (e) => {
+                e.preventDefault();
+                this.closeLeadgenModal();
+            });
+
+            // Close modal on Escape key
+            $(document).on('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    this.closeLeadgenModal();
+                }
             });
 
             // File input change
@@ -131,7 +153,7 @@
         }
 
         handleLeadgenSubmit() {
-            const $modal = this.$widget.find('.jobready-leadgen-modal');
+            const $modal = $('.jobready-leadgen-modal');
             const $results = this.$widget.find('.jobready-results');
             
             Utils.clearErrors($modal);
@@ -171,24 +193,32 @@
         }
 
         showLeadgenModal($results) {
-            // Remove any existing modal
-            this.$widget.find('.jobready-leadgen-modal').remove();
-            
-            const modal = `
-                <div class="jobready-leadgen-modal">
-                    <form class="jobready-leadgen-form">
-                        <div class="jobready-leadgen-title">
-                            Almost done! Please enter your name and email to receive your full report.
-                        </div>
-                        <input type="text" name="name" placeholder="Your Name" required />
-                        <input type="email" name="email" placeholder="Your Email" required />
-                        <div class="jobready-leadgen-error"></div>
-                        <button type="submit" class="jobready-leadgen-submit">Get My Report</button>
-                    </form>
-                </div>
+            // Remove any existing overlay/modal
+            $('.jobready-overlay').remove();
+
+            const overlay = document.createElement('div');
+            overlay.className = 'jobready-overlay';
+            overlay.setAttribute('role', 'dialog');
+            overlay.setAttribute('aria-modal', 'true');
+
+            const modal = document.createElement('div');
+            modal.className = 'jobready-leadgen-modal';
+            modal.innerHTML = `
+                <button type=\"button\" class=\"jobready-modal-close\" aria-label=\"Close\">&times;</button>
+                <form class=\"jobready-leadgen-form\">
+                    <div class=\"jobready-leadgen-title\">
+                        Almost done! Please enter your name and email to receive your full report.
+                    </div>
+                    <input type=\"text\" name=\"name\" placeholder=\"Your Name\" required />
+                    <input type=\"email\" name=\"email\" placeholder=\"Your Email\" required />
+                    <div class=\"jobready-leadgen-error\"></div>
+                    <button type=\"submit\" class=\"jobready-leadgen-submit\">Get My Report</button>
+                </form>
             `;
-            
-            $results.html(modal);
+
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+            document.body.classList.add('jobready-modal-open');
         }
 
         showLeadgenLoading($modal) {
@@ -444,28 +474,130 @@
                 $target.html(`<div class="jobready-error">${Utils.escapeHtml(errorMessage)}</div>`);
             }
         }
+
+        closeLeadgenModal() {
+            const overlay = document.querySelector('.jobready-overlay');
+            if (overlay) {
+                overlay.parentNode.removeChild(overlay);
+            }
+            document.body.classList.remove('jobready-modal-open');
+        }
     }
 
-    // Initialize JobReady when document is ready
+    // Lazy initialization manager
+    const JobReadyLazyLoader = {
+        initialized: new Set(),
+        
+        init() {
+            if (!CONFIG.LAZY_LOAD) {
+                // Immediate initialization (fallback for older browsers)
+                this.initializeAll();
+                return;
+            }
+            
+            // Use Intersection Observer for modern browsers
+            if ('IntersectionObserver' in window) {
+                this.initWithObserver();
+            } else {
+                // Fallback: initialize on scroll or interaction
+                this.initWithFallback();
+            }
+        },
+        
+        initWithObserver() {
+            const widgets = document.querySelectorAll('.jobready-widget');
+            if (widgets.length === 0) return;
+            
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const widget = entry.target;
+                        const id = widget.id || widget.className;
+                        if (!this.initialized.has(id)) {
+                            this.initializeWidget($(widget));
+                            observer.unobserve(widget);
+                        }
+                    }
+                });
+            }, {
+                rootMargin: '50px', // Start loading 50px before widget is visible
+                threshold: CONFIG.INTERSECTION_THRESHOLD
+            });
+            
+            widgets.forEach(widget => {
+                observer.observe(widget);
+            });
+            
+            // Also initialize on any user interaction (hover, click, focus)
+            widgets.forEach(widget => {
+                ['mouseenter', 'touchstart', 'focus'].forEach(eventType => {
+                    widget.addEventListener(eventType, () => {
+                        const id = widget.id || widget.className;
+                        if (!this.initialized.has(id)) {
+                            this.initializeWidget($(widget));
+                            observer.unobserve(widget);
+                        }
+                    }, { once: true, passive: true });
+                });
+            });
+        },
+        
+        initWithFallback() {
+            // Initialize on scroll or user interaction
+            let initialized = false;
+            const initOnInteraction = () => {
+                if (!initialized) {
+                    initialized = true;
+                    this.initializeAll();
+                    window.removeEventListener('scroll', initOnInteraction, { passive: true });
+                    window.removeEventListener('mousemove', initOnInteraction, { passive: true });
+                    window.removeEventListener('touchstart', initOnInteraction, { passive: true });
+                }
+            };
+            
+            window.addEventListener('scroll', initOnInteraction, { passive: true });
+            window.addEventListener('mousemove', initOnInteraction, { passive: true });
+            window.addEventListener('touchstart', initOnInteraction, { passive: true });
+            
+            // Also initialize after a short delay if no interaction
+            setTimeout(() => {
+                if (!initialized) {
+                    this.initializeAll();
+                }
+            }, 1000);
+        },
+        
+        initializeWidget($widget) {
+            const id = $widget.attr('id') || $widget[0].className;
+            if (!this.initialized.has(id)) {
+                this.initialized.add(id);
+                try {
+                    new JobReady($widget);
+                    Utils.debug('JobReady widget initialized:', id);
+                } catch (e) {
+                    console.error('JobReady initialization error:', e);
+                }
+            }
+        },
+        
+        initializeAll() {
+            $('.jobready-widget').each((index, element) => {
+                this.initializeWidget($(element));
+            });
+        }
+    };
+
+    // Initialize when DOM is ready
     $(document).ready(function() {
         Utils.debug('JobReady script loaded');
-        Utils.debug('jQuery version:', $.fn.jquery);
         
-        // Debug jobreadyRest object
-        Utils.debug('jobreadyRest object:', window.jobreadyRest);
+        // Initialize REST data (lightweight, always needed)
         if (window.jobreadyRest) {
-            Utils.debug('REST URL:', window.jobreadyRest.restUrl);
-            Utils.debug('Email URL:', window.jobreadyRest.emailUrl);
-            Utils.debug('Nonce available:', !!window.jobreadyRest.nonce);
-            Utils.debug('Token available:', !!window.jobreadyRest.token);
-        } else {
-            Utils.debug('ERROR: jobreadyRest object not found!');
+            Utils.debug('REST API configured');
         }
 
-        // Initialize JobReady for each widget on the page
-        $('.jobready-widget').each(function() {
-            new JobReady($(this));
-        });
+        // Lazy load widgets
+        JobReadyLazyLoader.init();
     });
 
 })(jQuery);
