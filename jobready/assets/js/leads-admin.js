@@ -119,6 +119,28 @@
         renderLeadDetails: function(lead) {
             const $content = $('#jobready-lead-modal-content');
             
+            // Construct resume URL if not available (for older leads)
+            let resumeUrl = lead.resume_url || '';
+            if (!resumeUrl && lead.pdf_url && lead.resume_filename) {
+                try {
+                    // Try to derive resume URL from PDF URL
+                    // PDF format: {base}_report.pdf -> Resume format: {base}.{ext}
+                    const pdfUrlObj = new URL(lead.pdf_url);
+                    const pdfPath = pdfUrlObj.pathname;
+                    const baseName = pdfPath
+                        .replace(/^\/uploads\//, '')
+                        .replace(/_report\.pdf$/i, '');
+                    const fileExt = lead.resume_filename.toLowerCase().endsWith('.docx') ? '.docx' : '.pdf';
+                    resumeUrl = pdfUrlObj.origin + '/uploads/' + baseName + fileExt;
+                } catch (e) {
+                    console.error('Error constructing resume URL:', e);
+                }
+            }
+            // Final fallback
+            if (!resumeUrl) {
+                resumeUrl = lead.pdf_url; // Fallback to PDF URL if we can't construct resume URL
+            }
+            
             const html = `
                 <h2>Lead Details</h2>
                 <div class="lead-details">
@@ -137,6 +159,10 @@
                         </div>
                     </div>
                     <div class="detail-row">
+                        <div class="detail-label">Phone:</div>
+                        <div class="detail-value">${lead.phone ? this.escapeHtml(lead.phone) : '<span style="color:#999">N/A</span>'}</div>
+                    </div>
+                    <div class="detail-row">
                         <div class="detail-label">ATS Score:</div>
                         <div class="detail-value">
                             <span class="score-badge ats-score">${lead.ats_score}%</span>
@@ -153,9 +179,15 @@
                         <div class="detail-value">${this.escapeHtml(lead.resume_filename)}</div>
                     </div>
                     <div class="detail-row">
-                        <div class="detail-label">PDF URL:</div>
+                        <div class="detail-label">Resume URL:</div>
                         <div class="detail-value">
-                            <a href="${this.escapeHtml(lead.pdf_url)}" target="_blank">View PDF</a>
+                            <a href="${this.escapeHtml(resumeUrl)}" target="_blank">View Resume</a>
+                        </div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Report PDF URL:</div>
+                        <div class="detail-value">
+                            <a href="${this.escapeHtml(lead.pdf_url)}" target="_blank">View Report</a>
                         </div>
                     </div>
                     <div class="detail-row">
@@ -188,7 +220,10 @@
                     </div>
                 </div>
                 <div class="lead-actions">
-                    <button type="button" class="button button-primary" onclick="window.open('${this.escapeHtml(lead.pdf_url)}', '_blank')">
+                    <button type="button" class="button button-primary" onclick="window.open('${this.escapeHtml(resumeUrl)}', '_blank')">
+                        View Resume
+                    </button>
+                    <button type="button" class="button button-secondary" onclick="window.open('${this.escapeHtml(lead.pdf_url)}', '_blank')">
                         View PDF Report
                     </button>
                     <button type="button" class="button button-secondary" onclick="JobReadyLeadsAdmin.closeModal()">

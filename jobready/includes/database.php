@@ -20,10 +20,12 @@ function jobready_create_leads_table() {
         job_fit_score int(3) NOT NULL,
         pdf_url text NOT NULL,
         resume_filename varchar(255) NOT NULL,
+        resume_url text DEFAULT '',
         job_description text NOT NULL,
         consent_given tinyint(1) DEFAULT 1,
         ip_address varchar(45) DEFAULT '',
         user_agent text DEFAULT '',
+        phone varchar(32) DEFAULT '',
         created_at datetime DEFAULT CURRENT_TIMESTAMP,
         updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (id),
@@ -35,6 +37,13 @@ function jobready_create_leads_table() {
     
     require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
     dbDelta($sql);
+    
+    // Add resume_url column if it doesn't exist (for existing installations)
+    $column_exists = $wpdb->get_results("SHOW COLUMNS FROM $table_name LIKE 'resume_url'");
+    if (empty($column_exists)) {
+        $wpdb->query("ALTER TABLE $table_name ADD COLUMN resume_url text DEFAULT '' AFTER resume_filename");
+        jobready_log('Added resume_url column to leads table');
+    }
     
     // Log the table creation
     jobready_log('Leads table creation attempted');
@@ -62,8 +71,10 @@ function jobready_store_lead($data) {
         'job_fit_score' => intval($data['job_fit_score']),
         'pdf_url' => esc_url_raw($data['pdf_url']),
         'resume_filename' => sanitize_text_field($data['resume_filename']),
+        'resume_url' => isset($data['resume_url']) ? esc_url_raw($data['resume_url']) : '',
         'job_description' => sanitize_textarea_field($data['job_description']),
         'consent_given' => isset($data['consent_given']) ? intval($data['consent_given']) : 1,
+        'phone' => isset($data['phone']) ? sanitize_text_field($data['phone']) : '',
         'ip_address' => jobready_get_client_ip(),
         'user_agent' => sanitize_text_field($_SERVER['HTTP_USER_AGENT'] ?? ''),
         'created_at' => current_time('mysql'),
@@ -235,10 +246,12 @@ function jobready_export_leads_csv($args = array()) {
         'Job Fit Score',
         'PDF URL',
         'Resume Filename',
+        'Resume URL',
         'Job Description',
         'Consent Given',
         'IP Address',
         'User Agent',
+        'Phone',
         'Created At',
         'Updated At'
     ));
@@ -253,10 +266,12 @@ function jobready_export_leads_csv($args = array()) {
             $lead->job_fit_score,
             $lead->pdf_url,
             $lead->resume_filename,
+            isset($lead->resume_url) ? $lead->resume_url : '',
             $lead->job_description,
             $lead->consent_given ? 'Yes' : 'No',
             $lead->ip_address,
             $lead->user_agent,
+            $lead->phone,
             $lead->created_at,
             $lead->updated_at
         ));

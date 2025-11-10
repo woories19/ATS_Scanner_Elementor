@@ -66,8 +66,10 @@ function jobready_handle_store_lead( WP_REST_Request $request ) {
     $job_fit_score = intval( $request->get_param( 'job_fit_score' ) );
     $pdf_url = esc_url_raw( $request->get_param( 'pdf_url' ) );
     $resume_filename = sanitize_text_field( $request->get_param( 'resume_filename' ) );
+    $resume_url = esc_url_raw( $request->get_param( 'resume_url' ) );
     $job_description = sanitize_textarea_field( $request->get_param( 'job_description' ) );
     $consent_given = $request->get_param( 'consent_given' );
+    $phone = sanitize_text_field( $request->get_param( 'phone' ) );
     
     error_log('[JobReady] Parsed lead params - Name: ' . $name . ', Email: ' . $email . ', ATS: ' . $ats_score . ', Fit: ' . $job_fit_score);
     
@@ -116,8 +118,10 @@ function jobready_handle_store_lead( WP_REST_Request $request ) {
         'job_fit_score' => $job_fit_score,
         'pdf_url' => $pdf_url,
         'resume_filename' => $resume_filename,
+        'resume_url' => $resume_url,
         'job_description' => $job_description,
-        'consent_given' => $consent_given !== 'false' ? 1 : 0
+        'consent_given' => $consent_given !== 'false' ? 1 : 0,
+        'phone' => $phone
     );
     
     error_log('[JobReady] Attempting to store lead data');
@@ -246,7 +250,8 @@ function jobready_mirror_to_google_sheets( $lead_data ) {
         'job_fit_score' => $lead_data['job_fit_score'],
         'resume_filename' => $lead_data['resume_filename'],
         'pdf_url' => $lead_data['pdf_url'],
-        'consent_given' => $lead_data['consent_given'] ? 'Yes' : 'No'
+        'consent_given' => $lead_data['consent_given'] ? 'Yes' : 'No',
+        'phone' => $lead_data['phone']
     );
     
     // Make non-blocking request to Google Sheets
