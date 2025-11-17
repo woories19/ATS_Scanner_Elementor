@@ -5,9 +5,8 @@
  * Description: Your personal resume assistant. Upload, scan, and get instant feedback on how job-ready your resume really is.
  * Author: GitHub
  * Author URI: https://github.com/woories19
- * Version: 0.8.9.6
+ * Version: 0.8.9.7
  * Elementor tested up to: 3.32
- * Elementor Pro tested up to: 3.32
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

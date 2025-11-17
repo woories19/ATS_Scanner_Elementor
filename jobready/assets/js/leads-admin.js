@@ -141,6 +141,9 @@
                 resumeUrl = lead.pdf_url; // Fallback to PDF URL if we can't construct resume URL
             }
             
+            const locationDisplay = this.formatLocation(lead);
+            const coordsDisplay = this.formatCoordinates(lead);
+
             const html = `
                 <h2>Lead Details</h2>
                 <div class="lead-details">
@@ -161,6 +164,13 @@
                     <div class="detail-row">
                         <div class="detail-label">Phone:</div>
                         <div class="detail-value">${lead.phone ? this.escapeHtml(lead.phone) : '<span style="color:#999">N/A</span>'}</div>
+                    </div>
+                    <div class="detail-row">
+                        <div class="detail-label">Location:</div>
+                        <div class="detail-value">
+                            ${locationDisplay ? this.escapeHtml(locationDisplay) : '<span style="color:#999">Unknown</span>'}
+                            ${coordsDisplay ? `<div style="font-size:12px;color:#646970;margin-top:4px;">${this.escapeHtml(coordsDisplay)}</div>` : ''}
+                        </div>
                     </div>
                     <div class="detail-row">
                         <div class="detail-label">ATS Score:</div>
@@ -327,6 +337,23 @@
             if (!dateString) return 'N/A';
             const date = new Date(dateString);
             return date.toLocaleString();
+        },
+
+        formatLocation: function(lead) {
+            const parts = [];
+            if (lead.geo_city) parts.push(lead.geo_city);
+            if (lead.geo_region) parts.push(lead.geo_region);
+            if (lead.geo_country) parts.push(lead.geo_country);
+            return parts.join(', ');
+        },
+
+        formatCoordinates: function(lead) {
+            if (lead.geo_lat == null || lead.geo_lng == null) {
+                return '';
+            }
+            const lat = Number(lead.geo_lat).toFixed(2);
+            const lng = Number(lead.geo_lng).toFixed(2);
+            return `${lat}, ${lng}${lead.geo_country_code ? ' • ' + lead.geo_country_code.toUpperCase() : ''}`;
         }
     };
 

@@ -197,6 +197,7 @@ function jobready_leads_admin_page() {
                             </th>
                             <th scope="col" class="manage-column column-email">Email</th>
                             <th scope="col" class="manage-column column-phone">Phone</th>
+                            <th scope="col" class="manage-column column-location">Location</th>
                             <th scope="col" class="manage-column column-scores">Scores</th>
                             <th scope="col" class="manage-column column-resume">Resume</th>
                             <th scope="col" class="manage-column column-created sortable <?php echo $orderby === 'created_at' ? strtolower( $order ) : ''; ?>">
@@ -221,6 +222,24 @@ function jobready_leads_admin_page() {
                                 </td>
                                 <td class="column-phone">
                                     <?php echo esc_html( $lead->phone ?? '' ); ?>
+                                </td>
+                                <td class="column-location">
+                                    <?php
+                                    $location_parts = array_filter( array(
+                                        $lead->geo_city ?? '',
+                                        $lead->geo_region ?? '',
+                                        $lead->geo_country ?? '',
+                                    ) );
+                                    $location_display = ! empty( $location_parts ) ? implode( ', ', $location_parts ) : 'Unknown';
+                                    $coords_available = ( isset( $lead->geo_lat, $lead->geo_lng ) && $lead->geo_lat !== null && $lead->geo_lng !== null );
+                                    ?>
+                                    <div class="location-primary"><?php echo esc_html( $location_display ); ?></div>
+                                    <?php if ( ! empty( $lead->geo_country_code ) ): ?>
+                                        <div class="location-meta"><?php echo esc_html( strtoupper( $lead->geo_country_code ) ); ?></div>
+                                    <?php endif; ?>
+                                    <?php if ( $coords_available ): ?>
+                                        <div class="location-meta"><?php echo esc_html( round( $lead->geo_lat, 2 ) . ', ' . round( $lead->geo_lng, 2 ) ); ?></div>
+                                    <?php endif; ?>
                                 </td>
                                 <td class="column-scores">
                                     <div class="score-item">
@@ -378,6 +397,20 @@ function jobready_leads_admin_page() {
         
         .column-scores .score-item {
             margin-bottom: 5px;
+        }
+
+        .column-location {
+            min-width: 140px;
+        }
+
+        .location-primary {
+            font-weight: 600;
+        }
+
+        .location-meta {
+            font-size: 12px;
+            color: #646970;
+            line-height: 1.2;
         }
         
         .score-label {
