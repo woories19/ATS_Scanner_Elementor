@@ -266,9 +266,9 @@
                     <div class=\"jobready-leadgen-title\">
                         Almost done! Please enter your name and email to receive your full report.
                     </div>
-                    <input type=\"text\" name=\"name\" placeholder=\"Your Name\" required />
-                    <input type=\"email\" name=\"email\" placeholder=\"Your Email\" required />
-                    <input type=\"tel\" name=\"phone\" placeholder=\"Phone (optional)\" pattern=\"[0-9+()\- ]*\" style=\"margin-bottom:16px;\" />
+                    <input type=\"text\" name=\"name\" placeholder=\"Your Name\" autocomplete=\"name\" required />
+                    <input type=\"email\" name=\"email\" placeholder=\"Your Email\" autocomplete=\"email\" required />
+                    <input type=\"tel\" name=\"phone\" placeholder=\"Phone (optional)\" autocomplete=\"tel\" pattern=\"[0-9+()\- ]*\" style=\"margin-bottom:16px;\" />
                     <div class=\"jobready-leadgen-error\"></div>
                     <button type=\"submit\" class=\"jobready-leadgen-submit\">Get My Report</button>
                 </form>
