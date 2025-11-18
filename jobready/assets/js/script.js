@@ -15,6 +15,22 @@
         INTERSECTION_THRESHOLD: 0.1 // Start loading when 10% visible
     };
 
+    const EMAIL_VALIDATION = {
+        PATTERN: /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9-]{1,63})+$/i,
+        DISPOSABLE_DOMAINS: new Set([
+            'mailinator.com',
+            'tempmail.com',
+            '10minutemail.com',
+            'guerrillamail.com',
+            'discard.email',
+            'trashmail.com',
+            'yopmail.com',
+            'fakeinbox.com',
+            'getnada.com',
+            'sharklasers.com'
+        ])
+    };
+
     // Utility functions
     const Utils = {
         debug: (...args) => {
@@ -51,6 +67,28 @@
 
         showLoading: ($container, message = 'Processing... please wait.') => {
             $container.html(`<div class="jobready-loading">${message}</div>`);
+        },
+
+        getEmailValidationMessage: (email) => {
+            const normalized = (email || '').trim();
+            if (!normalized) {
+                return 'Please enter your email address.';
+            }
+
+            if (normalized.indexOf('..') !== -1) {
+                return 'Email address contains invalid characters.';
+            }
+
+            if (!EMAIL_VALIDATION.PATTERN.test(normalized)) {
+                return 'Please enter a valid email address.';
+            }
+
+            const domain = normalized.split('@')[1]?.toLowerCase() || '';
+            if (EMAIL_VALIDATION.DISPOSABLE_DOMAINS.has(domain)) {
+                return 'Disposable or temporary email addresses are not allowed.';
+            }
+
+            return '';
         }
     };
 
@@ -158,19 +196,34 @@
             
             Utils.clearErrors($modal);
 
-            const name = $modal.find('input[name="name"]').val() || '';
-            const email = $modal.find('input[name="email"]').val() || '';
-            const phone = $modal.find('input[name="phone"]').val() || '';
+            const name = ($modal.find('input[name="name"]').val() || '').trim();
+            const email = ($modal.find('input[name="email"]').val() || '').trim();
+            const phone = ($modal.find('input[name="phone"]').val() || '').trim();
+            const $inlineError = $modal.find('.jobready-leadgen-error');
+            $inlineError.text('');
 
-            if (!name.trim() || !email.trim()) {
-                Utils.showError($modal, 'Please enter your name and email.');
+            if (!name) {
+                $inlineError.text('Please enter your name.');
                 return;
+            }
+
+            const emailValidationMessage = Utils.getEmailValidationMessage(email);
+            if (emailValidationMessage) {
+                $inlineError.text(emailValidationMessage);
+                return;
+            }
+
+            // Remove previous values before appending
+            if (this.leadgenData instanceof FormData) {
+                this.leadgenData.delete('name');
+                this.leadgenData.delete('email');
+                this.leadgenData.delete('phone');
             }
 
             // Add to FormData
             this.leadgenData.append('name', name);
             this.leadgenData.append('email', email);
-            if (phone.trim()) {
+            if (phone) {
                 this.leadgenData.append('phone', phone);
             }
 

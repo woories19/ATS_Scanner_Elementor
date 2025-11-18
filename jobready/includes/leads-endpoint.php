@@ -74,9 +74,13 @@ function jobready_handle_store_lead( WP_REST_Request $request ) {
     error_log('[JobReady] Parsed lead params - Name: ' . $name . ', Email: ' . $email . ', ATS: ' . $ats_score . ', Fit: ' . $job_fit_score);
     
     // Validate required fields
-    if ( empty( $email ) || ! is_email( $email ) ) {
-        error_log('[JobReady] Invalid email: ' . $email);
-        return new WP_REST_Response( array( 'error' => 'Valid email is required' ), 400 );
+    $email_validation = jobready_validate_email_address( $email );
+    if ( is_wp_error( $email_validation ) ) {
+        error_log('[JobReady] Invalid email: ' . $email_validation->get_error_message());
+        return new WP_REST_Response(
+            array( 'error' => $email_validation->get_error_message() ),
+            400
+        );
     }
     
     if ( empty( $name ) ) {
@@ -132,7 +136,10 @@ function jobready_handle_store_lead( WP_REST_Request $request ) {
     if ( is_wp_error( $lead_id ) ) {
         jobready_log( 'Failed to store lead: ' . $lead_id->get_error_message() );
         error_log('[JobReady] Lead storage failed: ' . $lead_id->get_error_message());
-        return new WP_REST_Response( array( 'error' => $lead_id->get_error_message() ), 500 );
+        return new WP_REST_Response(
+            array( 'error' => $lead_id->get_error_message() ),
+            jobready_get_rest_status_for_error( $lead_id )
+        );
     }
     
     error_log('[JobReady] Lead stored successfully with ID: ' . $lead_id);
@@ -231,6 +238,12 @@ function jobready_handle_get_lead_stats( WP_REST_Request $request ) {
     $stats = jobready_get_lead_stats();
     
     return new WP_REST_Response( $stats, 200 );
+}
+
+function jobready_get_rest_status_for_error( WP_Error $error ) {
+    $code = $error->get_error_code();
+    $bad_request_errors = array( 'invalid_email', 'invalid_email_format', 'disposable_email', 'invalid_email_domain' );
+    return in_array( $code, $bad_request_errors, true ) ? 400 : 500;
 }
 
 // Mirror lead data to Google Sheets (non-blocking)

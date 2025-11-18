@@ -63,9 +63,10 @@ function jobready_handle_email_fallback() {
     
     error_log('[JobReady] Fallback email params - Name: ' . $name . ', Email: ' . $email . ', ATS: ' . $ats_score . ', Fit: ' . $fit_score . ', PDF: ' . $pdf_url_raw);
     
-    if (empty($email) || !is_email($email)) {
-        error_log('[JobReady] Fallback email - Invalid email: ' . $email);
-        wp_send_json_error('Invalid email address');
+    $email_validation = jobready_validate_email_address( $email );
+    if ( is_wp_error( $email_validation ) ) {
+        error_log('[JobReady] Fallback email - Invalid email: ' . $email_validation->get_error_message());
+        wp_send_json_error( $email_validation->get_error_message() );
         return;
     }
     
@@ -194,9 +195,10 @@ function jobready_handle_send_report( WP_REST_Request $request ) {
 
     error_log('[JobReady] Parsed email params - Name: ' . $name . ', Email: ' . $email . ', ATS: ' . $ats_score . ', Fit: ' . $fit_score . ', PDF: ' . $pdf_url_raw);
 
-    if ( empty( $email ) || ! is_email( $email ) ) {
-        error_log('[JobReady] Invalid email: ' . $email);
-        return new WP_REST_Response( array( 'error' => 'Invalid email address' ), 400 );
+    $email_validation = jobready_validate_email_address( $email );
+    if ( is_wp_error( $email_validation ) ) {
+        error_log('[JobReady] Invalid email: ' . $email_validation->get_error_message());
+        return new WP_REST_Response( array( 'error' => $email_validation->get_error_message() ), 400 );
     }
     
     if ( empty( $pdf_url_raw ) ) {

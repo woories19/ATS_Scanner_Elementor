@@ -100,8 +100,9 @@ function jobready_store_lead($data) {
     );
     
     // Validate required fields
-    if (empty($lead_data['email']) || !is_email($lead_data['email'])) {
-        return new WP_Error('invalid_email', 'Invalid email address');
+    $email_validation = jobready_validate_email_address( $lead_data['email'] );
+    if ( is_wp_error( $email_validation ) ) {
+        return $email_validation;
     }
     
     if (empty($lead_data['name'])) {
@@ -400,6 +401,90 @@ function jobready_lookup_geo_location( $ip_address ) {
     set_transient( $cache_key, $geo_data, WEEK_IN_SECONDS );
 
     return $geo_data;
+}
+
+/**
+ * Validate email structure, disposable domains, and MX records
+ */
+function jobready_validate_email_address( $email ) {
+    $email = trim( (string) $email );
+
+    if ( $email === '' || ! is_email( $email ) ) {
+        return new WP_Error( 'invalid_email', __( 'Please enter a valid email address.', 'jobready' ) );
+    }
+
+    if ( strpos( $email, '..' ) !== false ) {
+        return new WP_Error( 'invalid_email_format', __( 'Email address contains invalid characters.', 'jobready' ) );
+    }
+
+    if ( jobready_is_disposable_email( $email ) ) {
+        return new WP_Error( 'disposable_email', __( 'Disposable email addresses are not allowed.', 'jobready' ) );
+    }
+
+    if ( ! jobready_email_has_mx_record( $email ) ) {
+        return new WP_Error( 'invalid_email_domain', __( 'Email domain cannot receive mail. Please use a different address.', 'jobready' ) );
+    }
+
+    return true;
+}
+
+/**
+ * Check if email belongs to a disposable domain
+ */
+function jobready_is_disposable_email( $email ) {
+    $domain = jobready_get_email_domain( $email );
+    if ( $domain === '' ) {
+        return false;
+    }
+
+    $disposable_domains = jobready_get_disposable_email_domains();
+    return in_array( $domain, $disposable_domains, true );
+}
+
+function jobready_get_email_domain( $email ) {
+    $parts = explode( '@', strtolower( $email ) );
+    return end( $parts );
+}
+
+function jobready_get_disposable_email_domains() {
+    $domains = array(
+        'mailinator.com',
+        'tempmail.com',
+        '10minutemail.com',
+        'guerrillamail.com',
+        'discard.email',
+        'trashmail.com',
+        'yopmail.com',
+        'fakeinbox.com',
+        'getnada.com',
+        'sharklasers.com',
+    );
+
+    return apply_filters( 'jobready_disposable_email_domains', $domains );
+}
+
+/**
+ * Check MX or fallback A records for email domain
+ */
+function jobready_email_has_mx_record( $email ) {
+    $domain = jobready_get_email_domain( $email );
+    if ( $domain === '' ) {
+        return false;
+    }
+
+    if ( function_exists( 'checkdnsrr' ) ) {
+        if ( checkdnsrr( $domain . '.', 'MX' ) ) {
+            return true;
+        }
+        // Fallback to A record
+        if ( checkdnsrr( $domain . '.', 'A' ) ) {
+            return true;
+        }
+        return false;
+    }
+
+    // If DNS functions unavailable, assume true to avoid false negatives
+    return true;
 }
 
 // Delete a lead
