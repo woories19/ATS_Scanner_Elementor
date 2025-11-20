@@ -196,6 +196,8 @@ function jobready_leads_admin_page() {
                                 </a>
                             </th>
                             <th scope="col" class="manage-column column-email">Email</th>
+                            <th scope="col" class="manage-column column-phone">Phone</th>
+                            <th scope="col" class="manage-column column-location">Location</th>
                             <th scope="col" class="manage-column column-scores">Scores</th>
                             <th scope="col" class="manage-column column-resume">Resume</th>
                             <th scope="col" class="manage-column column-created sortable <?php echo $orderby === 'created_at' ? strtolower( $order ) : ''; ?>">
@@ -218,6 +220,27 @@ function jobready_leads_admin_page() {
                                 <td class="column-email">
                                     <a href="mailto:<?php echo esc_attr( $lead->email ); ?>"><?php echo esc_html( $lead->email ); ?></a>
                                 </td>
+                                <td class="column-phone">
+                                    <?php echo esc_html( $lead->phone ?? '' ); ?>
+                                </td>
+                                <td class="column-location">
+                                    <?php
+                                    $location_parts = array_filter( array(
+                                        $lead->geo_city ?? '',
+                                        $lead->geo_region ?? '',
+                                        $lead->geo_country ?? '',
+                                    ) );
+                                    $location_display = ! empty( $location_parts ) ? implode( ', ', $location_parts ) : 'Unknown';
+                                    $coords_available = ( isset( $lead->geo_lat, $lead->geo_lng ) && $lead->geo_lat !== null && $lead->geo_lng !== null );
+                                    ?>
+                                    <div class="location-primary"><?php echo esc_html( $location_display ); ?></div>
+                                    <?php if ( ! empty( $lead->geo_country_code ) ): ?>
+                                        <div class="location-meta"><?php echo esc_html( strtoupper( $lead->geo_country_code ) ); ?></div>
+                                    <?php endif; ?>
+                                    <?php if ( $coords_available ): ?>
+                                        <div class="location-meta"><?php echo esc_html( round( $lead->geo_lat, 2 ) . ', ' . round( $lead->geo_lng, 2 ) ); ?></div>
+                                    <?php endif; ?>
+                                </td>
                                 <td class="column-scores">
                                     <div class="score-item">
                                         <span class="score-label">ATS:</span>
@@ -231,7 +254,30 @@ function jobready_leads_admin_page() {
                                 <td class="column-resume">
                                     <div class="resume-info">
                                         <div class="filename"><?php echo esc_html( $lead->resume_filename ); ?></div>
-                                        <a href="<?php echo esc_url( $lead->pdf_url ); ?>" target="_blank" class="pdf-link">View PDF</a>
+                                        <?php
+                                        // Use resume_url if available, otherwise construct from pdf_url or fallback to pdf_url
+                                        $resume_url = !empty($lead->resume_url) ? $lead->resume_url : '';
+                                        
+                                        // Fallback: Try to construct from pdf_url if resume_url is empty
+                                        if (empty($resume_url) && !empty($lead->pdf_url)) {
+                                            // Extract base from PDF URL (remove _report.pdf)
+                                            $resume_url = preg_replace('/_report\.pdf$/i', '', $lead->pdf_url);
+                                            // Add original file extension
+                                            $file_ext = strtolower(pathinfo($lead->resume_filename, PATHINFO_EXTENSION));
+                                            if (!empty($file_ext)) {
+                                                $resume_url .= '.' . $file_ext;
+                                            } else {
+                                                // Default to .pdf if extension can't be determined
+                                                $resume_url = $lead->pdf_url; // Fallback to PDF URL if we can't construct
+                                            }
+                                        }
+                                        
+                                        // Final fallback: use PDF URL if resume URL is still empty
+                                        if (empty($resume_url)) {
+                                            $resume_url = $lead->pdf_url;
+                                        }
+                                        ?>
+                                        <a href="<?php echo esc_url( $resume_url ); ?>" target="_blank" class="pdf-link">View Resume</a>
                                     </div>
                                 </td>
                                 <td class="column-created">
@@ -351,6 +397,20 @@ function jobready_leads_admin_page() {
         
         .column-scores .score-item {
             margin-bottom: 5px;
+        }
+
+        .column-location {
+            min-width: 140px;
+        }
+
+        .location-primary {
+            font-weight: 600;
+        }
+
+        .location-meta {
+            font-size: 12px;
+            color: #646970;
+            line-height: 1.2;
         }
         
         .score-label {

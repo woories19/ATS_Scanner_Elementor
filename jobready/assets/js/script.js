@@ -15,6 +15,22 @@
         INTERSECTION_THRESHOLD: 0.1 // Start loading when 10% visible
     };
 
+    const EMAIL_VALIDATION = {
+        PATTERN: /^[a-z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9-]{1,63})+$/i,
+        DISPOSABLE_DOMAINS: new Set([
+            'mailinator.com',
+            'tempmail.com',
+            '10minutemail.com',
+            'guerrillamail.com',
+            'discard.email',
+            'trashmail.com',
+            'yopmail.com',
+            'fakeinbox.com',
+            'getnada.com',
+            'sharklasers.com'
+        ])
+    };
+
     // Utility functions
     const Utils = {
         debug: (...args) => {
@@ -51,6 +67,28 @@
 
         showLoading: ($container, message = 'Processing... please wait.') => {
             $container.html(`<div class="jobready-loading">${message}</div>`);
+        },
+
+        getEmailValidationMessage: (email) => {
+            const normalized = (email || '').trim();
+            if (!normalized) {
+                return 'Please enter your email address.';
+            }
+
+            if (normalized.indexOf('..') !== -1) {
+                return 'Email address contains invalid characters.';
+            }
+
+            if (!EMAIL_VALIDATION.PATTERN.test(normalized)) {
+                return 'Please enter a valid email address.';
+            }
+
+            const domain = normalized.split('@')[1]?.toLowerCase() || '';
+            if (EMAIL_VALIDATION.DISPOSABLE_DOMAINS.has(domain)) {
+                return 'Disposable or temporary email addresses are not allowed.';
+            }
+
+            return '';
         }
     };
 
@@ -158,17 +196,36 @@
             
             Utils.clearErrors($modal);
 
-            const name = $modal.find('input[name="name"]').val() || '';
-            const email = $modal.find('input[name="email"]').val() || '';
+            const name = ($modal.find('input[name="name"]').val() || '').trim();
+            const email = ($modal.find('input[name="email"]').val() || '').trim();
+            const phone = ($modal.find('input[name="phone"]').val() || '').trim();
+            const $inlineError = $modal.find('.jobready-leadgen-error');
+            $inlineError.text('');
 
-            if (!name.trim() || !email.trim()) {
-                Utils.showError($modal, 'Please enter your name and email.');
+            if (!name) {
+                $inlineError.text('Please enter your name.');
                 return;
+            }
+
+            const emailValidationMessage = Utils.getEmailValidationMessage(email);
+            if (emailValidationMessage) {
+                $inlineError.text(emailValidationMessage);
+                return;
+            }
+
+            // Remove previous values before appending
+            if (this.leadgenData instanceof FormData) {
+                this.leadgenData.delete('name');
+                this.leadgenData.delete('email');
+                this.leadgenData.delete('phone');
             }
 
             // Add to FormData
             this.leadgenData.append('name', name);
             this.leadgenData.append('email', email);
+            if (phone) {
+                this.leadgenData.append('phone', phone);
+            }
 
             // Show pretty loading in modal (instead of abrupt removal)
             this.showLeadgenLoading($modal);
@@ -209,8 +266,9 @@
                     <div class=\"jobready-leadgen-title\">
                         Almost done! Please enter your name and email to receive your full report.
                     </div>
-                    <input type=\"text\" name=\"name\" placeholder=\"Your Name\" required />
-                    <input type=\"email\" name=\"email\" placeholder=\"Your Email\" required />
+                    <input type=\"text\" name=\"name\" placeholder=\"Your Name\" autocomplete=\"name\" required />
+                    <input type=\"email\" name=\"email\" placeholder=\"Your Email\" autocomplete=\"email\" required />
+                    <input type=\"tel\" name=\"phone\" placeholder=\"Phone (optional)\" autocomplete=\"tel\" pattern=\"[0-9+()\- ]*\" style=\"margin-bottom:16px;\" />
                     <div class=\"jobready-leadgen-error\"></div>
                     <button type=\"submit\" class=\"jobready-leadgen-submit\">Get My Report</button>
                 </form>
@@ -264,6 +322,41 @@
                         const resumeFile = this.leadgenData.get('resume');
                         const resumeFilename = resumeFile ? resumeFile.name : 'Unknown';
                         
+                        // Construct resume URL from Flask API
+                        // Flask saves resume as {name}.pdf or {name}.docx
+                        // Flask generates report as {name}_report.pdf
+                        // So we can derive resume URL from PDF URL by removing _report.pdf and using original extension
+                        let resumeUrl = '';
+                        if (response.pdf_url) {
+                            try {
+                                const pdfUrlObj = new URL(response.pdf_url);
+                                const pdfPath = pdfUrlObj.pathname;
+                                
+                                // Extract the base name (remove /uploads/ prefix and _report.pdf suffix)
+                                // Example: /uploads/john_doe_report.pdf -> john_doe
+                                const baseName = pdfPath
+                                    .replace(/^\/uploads\//, '')
+                                    .replace(/_report\.pdf$/i, '');
+                                
+                                // Get original file extension from uploaded filename
+                                const originalExt = resumeFilename.toLowerCase().endsWith('.docx') ? '.docx' : '.pdf';
+                                
+                                // Construct resume URL: {origin}/uploads/{baseName}{originalExt}
+                                resumeUrl = pdfUrlObj.origin + '/uploads/' + baseName + originalExt;
+                                
+                                Utils.debug('Constructed resume URL:', resumeUrl);
+                            } catch (e) {
+                                Utils.debug('Error constructing resume URL:', e);
+                                // Fallback: construct from API URL + original filename
+                                const apiBase = this.apiUrl.replace(/\/$/, '');
+                                resumeUrl = apiBase + '/uploads/' + encodeURIComponent(resumeFilename);
+                            }
+                        } else {
+                            // Last resort: use API URL + filename
+                            const apiBase = this.apiUrl.replace(/\/$/, '');
+                            resumeUrl = apiBase + '/uploads/' + encodeURIComponent(resumeFilename);
+                        }
+                        
                         // Get job description from the form
                         const jobDescription = this.leadgenData.get('job_description') || '';
                         
@@ -276,10 +369,12 @@
                             data: JSON.stringify({
                                 name: this.leadgenData.get('name') || '',
                                 email: this.leadgenData.get('email') || '',
+                                phone: this.leadgenData.get('phone') || '',
                                 ats_score: response.ats_score,
                                 job_fit_score: response.job_fit_score,
                                 pdf_url: response.pdf_url,
                                 resume_filename: resumeFilename,
+                                resume_url: resumeUrl,
                                 job_description: jobDescription,
                                 consent_given: true
                             }),

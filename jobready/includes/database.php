@@ -20,10 +20,18 @@ function jobready_create_leads_table() {
         job_fit_score int(3) NOT NULL,
         pdf_url text NOT NULL,
         resume_filename varchar(255) NOT NULL,
+        resume_url text DEFAULT '',
         job_description text NOT NULL,
         consent_given tinyint(1) DEFAULT 1,
         ip_address varchar(45) DEFAULT '',
         user_agent text DEFAULT '',
+        geo_city varchar(100) DEFAULT '',
+        geo_region varchar(100) DEFAULT '',
+        geo_country varchar(100) DEFAULT '',
+        geo_country_code varchar(8) DEFAULT '',
+        geo_lat decimal(10,6) DEFAULT NULL,
+        geo_lng decimal(10,6) DEFAULT NULL,
+        phone varchar(32) DEFAULT '',
         created_at datetime DEFAULT CURRENT_TIMESTAMP,
         updated_at datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (id),
@@ -35,6 +43,25 @@ function jobready_create_leads_table() {
     
     require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
     dbDelta($sql);
+    
+    // Ensure new columns exist for upgrades
+    $column_updates = array(
+        'resume_url' => "ALTER TABLE $table_name ADD COLUMN resume_url text DEFAULT '' AFTER resume_filename",
+        'geo_city' => "ALTER TABLE $table_name ADD COLUMN geo_city varchar(100) DEFAULT '' AFTER user_agent",
+        'geo_region' => "ALTER TABLE $table_name ADD COLUMN geo_region varchar(100) DEFAULT '' AFTER geo_city",
+        'geo_country' => "ALTER TABLE $table_name ADD COLUMN geo_country varchar(100) DEFAULT '' AFTER geo_region",
+        'geo_country_code' => "ALTER TABLE $table_name ADD COLUMN geo_country_code varchar(8) DEFAULT '' AFTER geo_country",
+        'geo_lat' => "ALTER TABLE $table_name ADD COLUMN geo_lat decimal(10,6) DEFAULT NULL AFTER geo_country_code",
+        'geo_lng' => "ALTER TABLE $table_name ADD COLUMN geo_lng decimal(10,6) DEFAULT NULL AFTER geo_lat",
+    );
+
+    foreach ( $column_updates as $column => $alter_sql ) {
+        $column_exists = $wpdb->get_results( $wpdb->prepare( "SHOW COLUMNS FROM $table_name LIKE %s", $column ) );
+        if ( empty( $column_exists ) ) {
+            $wpdb->query( $alter_sql );
+            jobready_log( "Added $column column to leads table" );
+        }
+    }
     
     // Log the table creation
     jobready_log('Leads table creation attempted');
@@ -62,8 +89,10 @@ function jobready_store_lead($data) {
         'job_fit_score' => intval($data['job_fit_score']),
         'pdf_url' => esc_url_raw($data['pdf_url']),
         'resume_filename' => sanitize_text_field($data['resume_filename']),
+        'resume_url' => isset($data['resume_url']) ? esc_url_raw($data['resume_url']) : '',
         'job_description' => sanitize_textarea_field($data['job_description']),
         'consent_given' => isset($data['consent_given']) ? intval($data['consent_given']) : 1,
+        'phone' => isset($data['phone']) ? sanitize_text_field($data['phone']) : '',
         'ip_address' => jobready_get_client_ip(),
         'user_agent' => sanitize_text_field($_SERVER['HTTP_USER_AGENT'] ?? ''),
         'created_at' => current_time('mysql'),
@@ -71,14 +100,18 @@ function jobready_store_lead($data) {
     );
     
     // Validate required fields
-    if (empty($lead_data['email']) || !is_email($lead_data['email'])) {
-        return new WP_Error('invalid_email', 'Invalid email address');
+    $email_validation = jobready_validate_email_address( $lead_data['email'] );
+    if ( is_wp_error( $email_validation ) ) {
+        return $email_validation;
     }
     
     if (empty($lead_data['name'])) {
         return new WP_Error('invalid_name', 'Name is required');
     }
     
+    // Append geo-location data if available
+    $lead_data = jobready_attach_geo_location_data( $lead_data );
+
     // Insert the lead
     $result = $wpdb->insert($table_name, $lead_data);
     
@@ -235,10 +268,18 @@ function jobready_export_leads_csv($args = array()) {
         'Job Fit Score',
         'PDF URL',
         'Resume Filename',
+        'Resume URL',
         'Job Description',
         'Consent Given',
         'IP Address',
         'User Agent',
+            'Phone',
+            'City',
+            'Region',
+            'Country',
+            'Country Code',
+            'Latitude',
+            'Longitude',
         'Created At',
         'Updated At'
     ));
@@ -253,10 +294,18 @@ function jobready_export_leads_csv($args = array()) {
             $lead->job_fit_score,
             $lead->pdf_url,
             $lead->resume_filename,
+            isset($lead->resume_url) ? $lead->resume_url : '',
             $lead->job_description,
             $lead->consent_given ? 'Yes' : 'No',
             $lead->ip_address,
             $lead->user_agent,
+            $lead->phone,
+            $lead->geo_city ?? '',
+            $lead->geo_region ?? '',
+            $lead->geo_country ?? '',
+            $lead->geo_country_code ?? '',
+            $lead->geo_lat ?? '',
+            $lead->geo_lng ?? '',
             $lead->created_at,
             $lead->updated_at
         ));
@@ -282,6 +331,160 @@ function jobready_get_client_ip() {
     }
     
     return $_SERVER['REMOTE_ADDR'] ?? '';
+}
+
+/**
+ * Enrich lead data with geo-location fields derived from IP address
+ */
+function jobready_attach_geo_location_data( $lead_data ) {
+    if ( empty( $lead_data['ip_address'] ) ) {
+        return $lead_data;
+    }
+
+    $geo_data = jobready_lookup_geo_location( $lead_data['ip_address'] );
+
+    if ( empty( $geo_data ) ) {
+        return $lead_data;
+    }
+
+    return array_merge( $lead_data, $geo_data );
+}
+
+/**
+ * Lookup city/region/country for an IP address with caching
+ */
+function jobready_lookup_geo_location( $ip_address ) {
+    if ( empty( $ip_address ) ) {
+        return array();
+    }
+
+    // Ensure only public IPs trigger lookups
+    if ( filter_var( $ip_address, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE ) === false ) {
+        return array();
+    }
+
+    $cache_key = 'jobready_geo_' . md5( $ip_address );
+    $cached = get_transient( $cache_key );
+    if ( $cached !== false ) {
+        return $cached;
+    }
+
+    $endpoint = sprintf( 'https://ipapi.co/%s/json/', rawurlencode( $ip_address ) );
+    $response = wp_remote_get( $endpoint, array( 'timeout' => 5 ) );
+
+    if ( is_wp_error( $response ) ) {
+        jobready_log( 'Geo lookup failed: ' . $response->get_error_message() );
+        return array();
+    }
+
+    $code = wp_remote_retrieve_response_code( $response );
+    if ( $code < 200 || $code >= 300 ) {
+        jobready_log( 'Geo lookup HTTP error: ' . $code );
+        return array();
+    }
+
+    $body = json_decode( wp_remote_retrieve_body( $response ), true );
+    if ( empty( $body ) || ! empty( $body['error'] ) ) {
+        jobready_log( 'Geo lookup response error for IP ' . $ip_address );
+        return array();
+    }
+
+    $geo_data = array(
+        'geo_city' => sanitize_text_field( $body['city'] ?? '' ),
+        'geo_region' => sanitize_text_field( $body['region'] ?? '' ),
+        'geo_country' => sanitize_text_field( $body['country_name'] ?? '' ),
+        'geo_country_code' => sanitize_text_field( $body['country_code'] ?? '' ),
+        'geo_lat' => isset( $body['latitude'] ) ? floatval( $body['latitude'] ) : null,
+        'geo_lng' => isset( $body['longitude'] ) ? floatval( $body['longitude'] ) : null,
+    );
+
+    set_transient( $cache_key, $geo_data, WEEK_IN_SECONDS );
+
+    return $geo_data;
+}
+
+/**
+ * Validate email structure, disposable domains, and MX records
+ */
+function jobready_validate_email_address( $email ) {
+    $email = trim( (string) $email );
+
+    if ( $email === '' || ! is_email( $email ) ) {
+        return new WP_Error( 'invalid_email', __( 'Please enter a valid email address.', 'jobready' ) );
+    }
+
+    if ( strpos( $email, '..' ) !== false ) {
+        return new WP_Error( 'invalid_email_format', __( 'Email address contains invalid characters.', 'jobready' ) );
+    }
+
+    if ( jobready_is_disposable_email( $email ) ) {
+        return new WP_Error( 'disposable_email', __( 'Disposable email addresses are not allowed.', 'jobready' ) );
+    }
+
+    if ( ! jobready_email_has_mx_record( $email ) ) {
+        return new WP_Error( 'invalid_email_domain', __( 'Email domain cannot receive mail. Please use a different address.', 'jobready' ) );
+    }
+
+    return true;
+}
+
+/**
+ * Check if email belongs to a disposable domain
+ */
+function jobready_is_disposable_email( $email ) {
+    $domain = jobready_get_email_domain( $email );
+    if ( $domain === '' ) {
+        return false;
+    }
+
+    $disposable_domains = jobready_get_disposable_email_domains();
+    return in_array( $domain, $disposable_domains, true );
+}
+
+function jobready_get_email_domain( $email ) {
+    $parts = explode( '@', strtolower( $email ) );
+    return end( $parts );
+}
+
+function jobready_get_disposable_email_domains() {
+    $domains = array(
+        'mailinator.com',
+        'tempmail.com',
+        '10minutemail.com',
+        'guerrillamail.com',
+        'discard.email',
+        'trashmail.com',
+        'yopmail.com',
+        'fakeinbox.com',
+        'getnada.com',
+        'sharklasers.com',
+    );
+
+    return apply_filters( 'jobready_disposable_email_domains', $domains );
+}
+
+/**
+ * Check MX or fallback A records for email domain
+ */
+function jobready_email_has_mx_record( $email ) {
+    $domain = jobready_get_email_domain( $email );
+    if ( $domain === '' ) {
+        return false;
+    }
+
+    if ( function_exists( 'checkdnsrr' ) ) {
+        if ( checkdnsrr( $domain . '.', 'MX' ) ) {
+            return true;
+        }
+        // Fallback to A record
+        if ( checkdnsrr( $domain . '.', 'A' ) ) {
+            return true;
+        }
+        return false;
+    }
+
+    // If DNS functions unavailable, assume true to avoid false negatives
+    return true;
 }
 
 // Delete a lead

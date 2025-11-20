@@ -66,15 +66,21 @@ function jobready_handle_store_lead( WP_REST_Request $request ) {
     $job_fit_score = intval( $request->get_param( 'job_fit_score' ) );
     $pdf_url = esc_url_raw( $request->get_param( 'pdf_url' ) );
     $resume_filename = sanitize_text_field( $request->get_param( 'resume_filename' ) );
+    $resume_url = esc_url_raw( $request->get_param( 'resume_url' ) );
     $job_description = sanitize_textarea_field( $request->get_param( 'job_description' ) );
     $consent_given = $request->get_param( 'consent_given' );
+    $phone = sanitize_text_field( $request->get_param( 'phone' ) );
     
     error_log('[JobReady] Parsed lead params - Name: ' . $name . ', Email: ' . $email . ', ATS: ' . $ats_score . ', Fit: ' . $job_fit_score);
     
     // Validate required fields
-    if ( empty( $email ) || ! is_email( $email ) ) {
-        error_log('[JobReady] Invalid email: ' . $email);
-        return new WP_REST_Response( array( 'error' => 'Valid email is required' ), 400 );
+    $email_validation = jobready_validate_email_address( $email );
+    if ( is_wp_error( $email_validation ) ) {
+        error_log('[JobReady] Invalid email: ' . $email_validation->get_error_message());
+        return new WP_REST_Response(
+            array( 'error' => $email_validation->get_error_message() ),
+            400
+        );
     }
     
     if ( empty( $name ) ) {
@@ -116,8 +122,10 @@ function jobready_handle_store_lead( WP_REST_Request $request ) {
         'job_fit_score' => $job_fit_score,
         'pdf_url' => $pdf_url,
         'resume_filename' => $resume_filename,
+        'resume_url' => $resume_url,
         'job_description' => $job_description,
-        'consent_given' => $consent_given !== 'false' ? 1 : 0
+        'consent_given' => $consent_given !== 'false' ? 1 : 0,
+        'phone' => $phone
     );
     
     error_log('[JobReady] Attempting to store lead data');
@@ -128,7 +136,10 @@ function jobready_handle_store_lead( WP_REST_Request $request ) {
     if ( is_wp_error( $lead_id ) ) {
         jobready_log( 'Failed to store lead: ' . $lead_id->get_error_message() );
         error_log('[JobReady] Lead storage failed: ' . $lead_id->get_error_message());
-        return new WP_REST_Response( array( 'error' => $lead_id->get_error_message() ), 500 );
+        return new WP_REST_Response(
+            array( 'error' => $lead_id->get_error_message() ),
+            jobready_get_rest_status_for_error( $lead_id )
+        );
     }
     
     error_log('[JobReady] Lead stored successfully with ID: ' . $lead_id);
@@ -229,6 +240,12 @@ function jobready_handle_get_lead_stats( WP_REST_Request $request ) {
     return new WP_REST_Response( $stats, 200 );
 }
 
+function jobready_get_rest_status_for_error( WP_Error $error ) {
+    $code = $error->get_error_code();
+    $bad_request_errors = array( 'invalid_email', 'invalid_email_format', 'disposable_email', 'invalid_email_domain' );
+    return in_array( $code, $bad_request_errors, true ) ? 400 : 500;
+}
+
 // Mirror lead data to Google Sheets (non-blocking)
 function jobready_mirror_to_google_sheets( $lead_data ) {
     $google_sheets_url = get_option( 'jobready_google_sheets_url', '' );
@@ -246,7 +263,8 @@ function jobready_mirror_to_google_sheets( $lead_data ) {
         'job_fit_score' => $lead_data['job_fit_score'],
         'resume_filename' => $lead_data['resume_filename'],
         'pdf_url' => $lead_data['pdf_url'],
-        'consent_given' => $lead_data['consent_given'] ? 'Yes' : 'No'
+        'consent_given' => $lead_data['consent_given'] ? 'Yes' : 'No',
+        'phone' => $lead_data['phone']
     );
     
     // Make non-blocking request to Google Sheets
