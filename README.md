@@ -1,7 +1,5 @@
 # JobReady - Resume Analyzer & Lead Generator
 
-**Version: 0.8.8**
-
 JobReady is a comprehensive WordPress plugin that transforms your website into a powerful resume analysis and lead generation tool. Built as an Elementor widget, it allows users to upload their resumes and receive instant feedback on ATS compatibility, job fit scores, and detailed improvement suggestions.
 
 ---
